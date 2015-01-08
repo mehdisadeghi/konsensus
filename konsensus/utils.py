@@ -2,8 +2,9 @@
     consensus
     ~~~~~~~~~
 
-    This file is part of consensus project.
+    This file is part of kansensus project.
 """
+
 import logging
 
 __author__ = 'Mehdi Sadeghi'

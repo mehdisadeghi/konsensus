@@ -2,14 +2,15 @@
     consensus
     ~~~~~~~~~
 
-    This file is part of consensus project.
+    This file is part of kansensus project.
 """
+
 from utils import log
 
 __author__ = 'Mehdi Sadeghi'
 
 
-class ConsensusAPI(object):
+class KonsensusAPI(object):
     @log
     def hello(self, name, *args, **kwargs):
         return "Hello {0}. I am Consensus #{1}".format(name, 1)

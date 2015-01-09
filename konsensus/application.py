@@ -1,13 +1,13 @@
 """
-    consensus
+    konsensus
     ~~~~~~~~~
 
-    This file is part of kansensus project.
+    This file is part of konsensus project.
 """
 import logging
+import zmq
 import zerorpc
 import gevent
-import zmq
 
 from .api import KonsensusAPI
 from .defaults import DefaultConfig
@@ -21,8 +21,8 @@ class KonsensusApp(object):
         logging.basicConfig(level=logging.DEBUG)
 
     def run(self):
-        gevent.joinall([gevent.spawn(self._run_api_listener),
-                        gevent.spawn(self._run_heartbeat_listener),
+        gevent.joinall([gevent.spawn(self._run_heartbeat_listener),
+                        gevent.spawn(self._run_api_listener),
                         gevent.spawn(self._run_heartbeat_broadcast)])
 
     def _run_api_listener(self):
@@ -38,9 +38,12 @@ class KonsensusApp(object):
         pass
 
     def _run_heartbeat_broadcast(self):
+        while True:
+            gevent.sleep(1)
+            print "heartbeat"
         context = zmq.Context()
         socket = context.socket(zmq.PUB)
         socket.bind("tcp://*:%s" % DefaultConfig.HEARTBEAT_PORT)
 
-        while True:
-            topic =
+        #while True:
+        #    topic = DefaultConfig.ZMQ_HEARTBEAT_TOPIC

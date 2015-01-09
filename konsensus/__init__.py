@@ -1,8 +1,8 @@
 """
-    consensus
+    konsensus
     ~~~~~~~~~
 
-    This file is part of kansensus project.
+    This file is part of konsensus project.
 """
 from application import KonsensusApp
 

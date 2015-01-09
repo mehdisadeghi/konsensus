@@ -1,13 +1,11 @@
 """
-    consensus
+    konsensus
     ~~~~~~~~~
 
-    This file is part of kansensus project.
+    This file is part of konsensus project.
 """
 
 import logging
-
-__author__ = 'Mehdi Sadeghi'
 
 
 def log(func, *args, **kwargs):

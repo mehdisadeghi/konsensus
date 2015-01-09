@@ -7,3 +7,6 @@ class DefaultConfig(object):
 
     ZMQ_HEARTBEAT_TOPIC = 10001
 
+    BOOTSTRAP_HOST = "127.0.0.1"
+    BOOTSTRAP_PORT = 8468
+

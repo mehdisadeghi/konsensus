@@ -23,4 +23,5 @@ def log(func, *args, **kwargs):
         res = func(*args, **kwargs)
         logging.debug("Fuction result: %s" % res)
         return res
+    new_func.__doc__ = func.__doc__
     return new_func

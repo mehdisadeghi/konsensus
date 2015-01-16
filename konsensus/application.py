@@ -11,8 +11,10 @@ import gevent
 
 from blinker import signal
 
-from .api import KonsensusAPI
-from .defaults import DefaultConfig
+from api import KonsensusAPI
+from defaults import DefaultConfig
+from constants import NEW_OPERATION_TOPIC, HEARTBEAT_TOPIC
+from manager import KonsensusManager
 
 
 class KonsensusApp(object):
@@ -30,7 +32,7 @@ class KonsensusApp(object):
 
     def _run_api_listener(self):
         logging.info("Starting server")
-        self.api = KonsensusAPI()
+        self.api = KonsensusAPI(KonsensusManager())
         s = zerorpc.Server(self.api)
         conn_string = "tcp://{host}:{port}".format(host=self.host,
                                                    port=self.port)
@@ -45,13 +47,16 @@ class KonsensusApp(object):
 
         def new_op_handler(sender, op_name=None):
             logging.debug("Got a signal for operation %s from %s" % (op_name, sender))
-            socket.send("New operation available: %s" % op_name)
+            socket.send("%s %s" % (NEW_OPERATION_TOPIC, op_name))
 
         logging.debug("Connecting to operation.new signal")
         sig = signal('operation.new')
-        sig.test = new_op_handler
         sig.connect(new_op_handler, weak=False)
-        logging.debug('signal receivers: %s' % sig.receivers)
+
+        # Move to discovery and heartbeat monitoring module
+        #while True:
+        #    socket.send('%d %s' % (HEARTBEAT_TOPIC, 'hb'))
+        #    gevent.sleep(1)
 
     def _subscribe_to_peers(self):
         """
@@ -62,20 +67,25 @@ class KonsensusApp(object):
         socket = context.socket(zmq.SUB)
         socket.setsockopt(zmq.SUBSCRIBE, '')
 
+        import socket as sk
+        self_ip = sk.gethostbyname(sk.gethostname())
+        
         for ip in DefaultConfig.PEERS:
-            address = '%s:%s' % (ip, DefaultConfig.PUB_PORT)
-            logging.debug('Subscribing to peer at: %s' % address)
-            socket.connect('tcp://%s' % address)
+            if ip != str(self_ip):
+                address = '%s:%s' % (ip, DefaultConfig.PUB_PORT)
+                logging.debug('Subscribing to peer at: %s' % address)
+                socket.connect('tcp://%s' % address)
 
         def new_msg_handler(sender, msg=None):
-            logging.debug('Got a new message: %s' % msg)
+            topic, message, = msg.split()
+            logging.debug('News for topic %s, msg: %s' % (topic, message))
+            self.api.handle_topic(topic, message)
 
         sig = signal('message.new')
-        logging.debug('signal receivers: %s' % sig.receivers)
         sig.connect(new_msg_handler, weak=False)
+        logging.debug('signal receivers: %s' % sig.receivers)
 
         while True:
             msg = socket.recv()
-            logging.debug('Got a msg from socket: %s' % msg)
             sig.send(self, msg=msg)
             gevent.sleep(.1)

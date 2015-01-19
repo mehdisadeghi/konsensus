@@ -5,18 +5,60 @@
     This file is part of konsensus project.
 """
 import os
+import uuid
+import functools
 import logging
+import gevent
 
 import h5py
 import numpy as np
 from blinker import signal
+
+import constants
+
+
+def delegate(func):
+    @functools.wraps(func)
+    def new_func(self, dataset, *args, **kwargs):
+        if dataset not in self.local_datasets:
+            logging.debug('Dataset %s is not available locally, trying to delegate.' % dataset)
+
+            # delegate_signal = signal(constants.DELEGATE_SIG)
+            # delegate_signal.send(self, command=func.__name__, dataset=dataset)
+
+            # Make an id
+            operation_id = str(uuid.uuid4())
+
+            publish = signal(constants.PUBLISH)
+            publish.send(self,
+                         topic=constants.DELEGATE_TOPIC,
+                         command=func.__name__,
+                         dataset=dataset,
+                         id=operation_id)
+            logging.debug('Request for dataset %s published, waiting for someone to answer' % dataset)
+
+
+            def accept_handler(sender, info=None):
+                logging.debug('Delegate request for dataset %s accepted with this info: %s' % (dataset, info))
+
+            accept_signal = signal(constants.PEER_ACCEPTED_DELEGATE_SIG)
+            accept_signal.connect(accept_handler)
+
+            gevent.sleep(5)
+
+            # return proxy or call remote and return the result
+
+        else:
+            return func(self, dataset, *args, **kwargs)
+    return new_func
 
 
 class KonsensusManager(object):
     """
     Implements the logic.
     """
-    def __init__(self):
+    def __init__(self, config):
+        self.config = config
         self.local_datasets = {}
         self.peers = {}
         self.ops = {}
@@ -25,18 +67,22 @@ class KonsensusManager(object):
         self._load_datasets()
 
     def _load_datasets(self):
-        for dirpath, dirnames, filenames in os.walk("samples"):
-            for filename in filenames:
-                path = os.path.join(dirpath, filename)
-                if filename.endswith(".hdf5"):
-                    self.local_datasets[filename] = {'size': os.path.getsize(path)}
-        return self.local_datasets
+        # for dirpath, dirnames, filenames in os.walk(self.config.DATASET_PATH):
+        #     for filename in filenames:
+        #         path = os.path.join(dirpath, filename)
+        #         if filename.endswith('.hdf5') or filename.endswith('.h5'):
+        #             self.local_datasets[filename] = {'size': os.path.getsize(path)}
 
-    def _default_handler(self, topic, message):
+        f = h5py.File(self.config.HDF5_REPO, 'r')
+        for key, value in f.iteritems():
+            if isinstance(value, h5py.Dataset):
+                self.local_datasets[key] = {'array size': value.size}
+
+    def _default_handler(self, topic, messages):
         """
         Default handler for any message type
         :param topic:
-        :param message:
+        :param messages:
         :return:
         """
         logging.error('No handler assigned for topic %s' % topic)
@@ -77,16 +123,6 @@ class KonsensusManager(object):
         Get the know datasets to this peer
         :return:
         """
-        # import os
-        # datasets = {}
-        # for dirpath, dirnames, filenames in os.walk("samples"):
-        #     for filename in filenames:
-        #         path = os.path.join(dirpath, filename)
-        #         if filename.endswith(".hdf5"):
-        #             datasets[filename] = {'size': os.path.getsize(path),
-        #                                   'endpoint': 'tcp://127.0.0.1:4200'}
-        # #self.datasets.update({'ds#1': {'size': '10000', 'endpoint': 'tcp://127.0.0.1:4200'}})
-        # self.datasets.update(datasets)
         return self.local_datasets
 
     def get_dataset(self, key, *args, **kwargs):
@@ -117,34 +153,55 @@ class KonsensusManager(object):
     def get_net_map(self):
         return self.netmap
 
-    def handle_topic(self, topic, message):
+    def handle_topic(self, topic, messages):
         """
         Lookup topic handler and call them
         :param topic:
-        :param message:
+        :param messages:
         :return:
         """
+        logging.debug('Manager: got a handling request for topic '
+                      '%s. Registered handlers: %s' % (topic, self._topic_handlers))
         if topic not in self._topic_handlers:
-            return self._default_handler(topic, message)
+            return self._default_handler(topic, messages)
         else:
             for handler in self._topic_handlers[topic]:
-                handler()
+                handler.handle(self, messages)
 
-    @look_for_dataset()
-    def use_case_1(self, dataset):
+    def has_dataset(self, dataset):
+        """
+        Check if we have the dataset available
+        :param dataset:
+        :return:
+        """
+        return dataset in self.local_datasets
+
+    def has_command(self, command):
+        """
+        Check if the given string represents a method on this class
+        :param command:
+        :return:
+        """
+        return hasattr(self, command)
+
+    @delegate
+    def use_case_1(self, dataset, *args, **kargs):
         """
         Invokes operation for use case 1 described in the report
         :param dataset:
         :return:
         """
-        pass
+        import socket
+        hostname = socket.gethostname()
+        logging.debug('Request for use case 1 with dataset name %s at host %s received' % (dataset, hostname))
 
+        if dataset not in self.local_datasets:
+            raise Exception("We don't have this dataset: %s" % dataset)
 
-def look_for_dataset(func, dataset):
-    """
-    Check if dataset is available locally
-    :param func:
-    :param dataset:
-    :return:
-    """
-    pass
+        f = h5py.File(self.config.HDF5_REPO, 'r')
+        result = np.array(f.get(dataset))
+        for i in xrange(len(result)):
+            result[i] = np.mod(result[i], 2)
+
+        return str(result)
+

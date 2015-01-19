@@ -46,3 +46,6 @@ class KonsensusAPI(object):
         :return:
         """
         return self._manager.get_commands()
+
+    def use_case_1(self, dataset, *args, **kargs):
+        return self._manager.use_case_1(dataset, *args, **kargs)

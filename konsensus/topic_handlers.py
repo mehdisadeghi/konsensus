@@ -9,7 +9,7 @@ import logging
 
 from blinker import signal
 
-from konsensus import constants
+import constants
 
 
 class ZMQTopicHandlerBase(object):
@@ -33,7 +33,7 @@ class DelegateTopicHandler(ZMQTopicHandlerBase):
         # Check data availability
         if not manager.has_dataset(delegate_info['dataset']):
             # Don't need to do anything, pass with a message
-            logging.debug('Ignoring a request for %s on dataset %s' % (delegate_info['command'],
+            logging.debug('Ignoring a request for %s on dataset %s because we do not have the data' % (delegate_info['command'],
                                                                        delegate_info['dataset']))
             return
 
@@ -54,9 +54,12 @@ class DelegateTopicHandler(ZMQTopicHandlerBase):
         publish.send(self, topic=constants.DELEGATE_ACCEPTED_TOPIC, id=delegate_info['id'])
 
         logging.debug('Running the delegated command.')
+        #TODO: A central service repository is required
         func = getattr(manager, delegate_info['command'])
         dataset = delegate_info['dataset']
         del(delegate_info['dataset'])
+        #TODO: It should be done without this flag here
+        delegate_info['is_delegate'] = True
         result = func(dataset, **delegate_info)
         logging.debug('Delegated command finished with result: %s' % result)
 

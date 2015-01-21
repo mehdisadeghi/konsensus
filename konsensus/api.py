@@ -16,6 +16,10 @@ class KonsensusAPI(object):
     def echo(self, msg):
         return msg
 
+    def get_peers(self):
+        """Returns the peer list"""
+        return self._manager.get_peers()
+
     def hello(self, name, *args, **kwargs):
         """
         Greeting.

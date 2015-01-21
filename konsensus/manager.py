@@ -20,11 +20,13 @@ import constants
 def delegate(func):
     @functools.wraps(func)
     def new_func(self, dataset, *args, **kwargs):
+        # If the function has already been delegated don't circulate it again.
+        if 'is_delegate' in kwargs:
+            logging.debug('Ignoring delegation try for already delegated request')
+            return func(self, dataset, *args, **kwargs)
+
         if dataset not in self.local_datasets:
             logging.debug('Dataset %s is not available locally, trying to delegate.' % dataset)
-
-            # delegate_signal = signal(constants.DELEGATE_SIG)
-            # delegate_signal.send(self, command=func.__name__, dataset=dataset)
 
             # Make an id
             operation_id = str(uuid.uuid4())
@@ -36,7 +38,6 @@ def delegate(func):
                          dataset=dataset,
                          id=operation_id)
             logging.debug('Request for dataset %s published, waiting for someone to answer' % dataset)
-
 
             def accept_handler(sender, info=None):
                 logging.debug('Delegate request for dataset %s accepted with this info: %s' % (dataset, info))
@@ -160,8 +161,7 @@ class KonsensusManager(object):
         :param messages:
         :return:
         """
-        logging.debug('Manager: got a handling request for topic '
-                      '%s. Registered handlers: %s' % (topic, self._topic_handlers))
+        #logging.debug('Manager: got a handling request for topic %s. Registered handlers: %s' % (topic, self._topic_handlers))
         if topic not in self._topic_handlers:
             return self._default_handler(topic, messages)
         else:
@@ -183,6 +183,10 @@ class KonsensusManager(object):
         :return:
         """
         return hasattr(self, command)
+
+    def get_peers(self):
+        """Returns the peers"""
+        return self.config.PEERS
 
     @delegate
     def use_case_1(self, dataset, *args, **kargs):

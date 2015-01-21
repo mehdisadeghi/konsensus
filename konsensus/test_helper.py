@@ -56,6 +56,17 @@ if __name__ == '__main__':
     peers = []
     apps = []
 
+    # Make an entry point node for sake of simplicity and ease of use
+    entry_point_config = make_config(0)
+    entry_point_config.update({
+        'PEER_ID': 0,
+        'API_PORT': 9998,  # API port. Application will listen for incoming requests
+        'PUB_PORT': 9999,  # Will publish all the news on this port.
+        'PEERS': [],  # ('127.0.0.1', 9201) Name of peers to subscribe to their publisher port.
+        'HDF5_REPO': None})
+    print entry_point_config
+    configs.append(entry_point_config)
+    peers.append(('127.0.0.1', entry_point_config.PUB_PORT))
     for c in xrange(int(args.count)):
         config = make_config(c+1)
         peers.append(('127.0.0.1', config.PUB_PORT))
@@ -66,7 +77,8 @@ if __name__ == '__main__':
     from multiprocessing import Process
     for config in configs:
         print '*** going to cook an app'
-        make_hdf5(config.HDF5_REPO, 'ds%s' % config.PEER_ID)
+        if config.HDF5_REPO:
+            make_hdf5(config.HDF5_REPO, 'ds%s' % config.PEER_ID)
         config.PEERS = [p for p in peers if p != ('127.0.0.1', config.PUB_PORT)]
         app = application.KonsensusApp(config.PEER_ID, config=config)
         apps.append(app)

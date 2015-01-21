@@ -14,7 +14,6 @@ class DefaultConfig(dict):
             'PUB_PORT': 4201,  # Will publish all the news on this port.
             'PEERS': [('153.96.75.60', 4200),
                       ('153.96.74.161', 4200)],  # Name of peers to subscribe to. Localhost ip will be ignored
-            #DATASET_PATH = '/W5/sade/workspace/hdf5_samples'
             'HDF5_REPO': '/W5/sade/workspace/hdf5_samples/usecase1.h5'
         })
 

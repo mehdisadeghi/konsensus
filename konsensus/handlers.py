@@ -20,6 +20,7 @@ class ZMQTopicHandlerBase(object):
     def handle(self, *args, **kwargs):
         return NotImplementedError
 
+
 class DelegateTopicHandler(ZMQTopicHandlerBase):
     def __init__(self):
         ZMQTopicHandlerBase.__init__(self)
@@ -51,7 +52,8 @@ class DelegateTopicHandler(ZMQTopicHandlerBase):
 
         # Inform other peers that we take care of the operation
         publish = signal(constants.PUBLISH)
-        publish.send(self, topic=constants.DELEGATE_ACCEPTED_TOPIC, id=delegate_info['id'])
+        publish.send(self, topic=constants.DELEGATE_ACCEPTED_TOPIC, delegate_id=delegate_info['delegate_id'],
+                     peer=delegate_info['peer'])
 
         logging.debug('Running the delegated command.')
         #TODO: A central service repository is required
@@ -63,10 +65,10 @@ class DelegateTopicHandler(ZMQTopicHandlerBase):
         result = func(dataset, **delegate_info)
         logging.debug('Delegated command finished with result: %s' % result)
 
-
         # # Also inform other parts of the app about accepting
         # accept_signal = signal(constants.DELEGATE_ACCEPTED_SIG)
         # accept_signal.send(self, id=delegate_info['id'])
+
 
 class DelegateAcceptedTopicHandler(ZMQTopicHandlerBase):
     def __init__(self):

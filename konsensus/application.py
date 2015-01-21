@@ -30,6 +30,7 @@ class KonsensusApp(object):
 
     def _get_logger(self):
         logger = logging.getLogger('%s.%s' % (__name__, self.config.PEER_ID))
+        #logger = logging.getLogger(__name__)
         if logger.handlers:
             return logger
         logger.propagate = False
@@ -47,7 +48,7 @@ class KonsensusApp(object):
         :param manager:
         :return:
         """
-        import topic_handlers as th
+        import handlers as th
         import inspect
         for name, class_type in inspect.getmembers(th, predicate=inspect.isclass):
             if class_type is th.ZMQTopicHandlerBase:

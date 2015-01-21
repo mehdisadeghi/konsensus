@@ -4,14 +4,11 @@
 
     This file is part of konsensus project.
 """
-import os
 import uuid
 import functools
 import logging
 import gevent
 
-import h5py
-import numpy as np
 from blinker import signal
 
 import constants
@@ -22,11 +19,11 @@ def delegate(func):
     def new_func(self, dataset, *args, **kwargs):
         # If the function has already been delegated don't circulate it again.
         if 'is_delegate' in kwargs:
-            logging.debug('Ignoring delegation try for already delegated request')
+            self.logger.debug('Ignoring delegation try for already delegated request')
             return func(self, dataset, *args, **kwargs)
 
         if dataset not in self.local_datasets:
-            logging.debug('Dataset %s is not available locally, trying to delegate.' % dataset)
+            self.logger.debug('Dataset %s is not available locally, trying to delegate.' % dataset)
 
             # Make an id
             operation_id = str(uuid.uuid4())
@@ -36,17 +33,27 @@ def delegate(func):
                          topic=constants.DELEGATE_TOPIC,
                          command=func.__name__,
                          dataset=dataset,
-                         id=operation_id)
-            logging.debug('Request for dataset %s published, waiting for someone to answer' % dataset)
+                         delegate_id=operation_id)
+            self.logger.debug('Request for dataset %s published, waiting for someone to answer' % dataset)
+
+            global reply
+            reply = None
 
             def accept_handler(sender, info=None):
-                logging.debug('Delegate request for dataset %s accepted with this info: %s' % (dataset, info))
+                self.logger.debug('Delegate request for dataset %s accepted with this info: %s' % (dataset, info))
+                global reply
+                reply = info
 
             accept_signal = signal(constants.PEER_ACCEPTED_DELEGATE_SIG)
             accept_signal.connect(accept_handler)
 
             gevent.sleep(5)
 
+            def proxy_func(*args, **kwargs):
+                global reply
+                if reply:
+                    return 'You request with id %s is delivered to peer %s' % (reply['delegate_id'], reply['peer'])
+            return proxy_func()
             # return proxy or call remote and return the result
 
         else:
@@ -59,6 +66,7 @@ class KonsensusManager(object):
     Implements the logic.
     """
     def __init__(self, config):
+        self.logger = logging.getLogger(__name__)
         self.config = config
         self.local_datasets = {}
         self.peers = {}
@@ -68,16 +76,12 @@ class KonsensusManager(object):
         self._load_datasets()
 
     def _load_datasets(self):
-        # for dirpath, dirnames, filenames in os.walk(self.config.DATASET_PATH):
-        #     for filename in filenames:
-        #         path = os.path.join(dirpath, filename)
-        #         if filename.endswith('.hdf5') or filename.endswith('.h5'):
-        #             self.local_datasets[filename] = {'size': os.path.getsize(path)}
-
-        f = h5py.File(self.config.HDF5_REPO, 'r')
-        for key, value in f.iteritems():
-            if isinstance(value, h5py.Dataset):
-                self.local_datasets[key] = {'array size': value.size}
+        import h5py
+        if self.config.HDF5_REPO:
+            f = h5py.File(self.config.HDF5_REPO, 'r')
+            for key, value in f.iteritems():
+                if isinstance(value, h5py.Dataset):
+                    self.local_datasets[key] = {'array size': value.size}
 
     def _default_handler(self, topic, messages):
         """
@@ -86,7 +90,7 @@ class KonsensusManager(object):
         :param messages:
         :return:
         """
-        logging.error('No handler assigned for topic %s' % topic)
+        self.logger.error('No handler assigned for topic %s' % topic)
 
     def register_handler(self, topic, handler):
         """
@@ -143,7 +147,7 @@ class KonsensusManager(object):
         if name in self.ops:
             raise Exception('Operation is already submitted.')
 
-        logging.debug('Recieved a new operation request, signaling.')
+        self.logger.debug('Recieved a new operation request, signaling.')
         sig = signal('operation.new')
         sig.send(self, op_name=name)
         self.ops[name] = name
@@ -196,8 +200,10 @@ class KonsensusManager(object):
         :return:
         """
         import socket
+        import h5py
+        import numpy as np
         hostname = socket.gethostname()
-        logging.debug('Request for use case 1 with dataset name %s at host %s received' % (dataset, hostname))
+        self.logger.debug('Request for use case 1 with dataset name %s at host %s received' % (dataset, hostname))
 
         if dataset not in self.local_datasets:
             raise Exception("We don't have this dataset: %s" % dataset)

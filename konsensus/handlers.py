@@ -52,7 +52,9 @@ class DelegateTopicHandler(ZMQTopicHandlerBase):
 
         # Inform other peers that we take care of the operation
         publish = signal(constants.PUBLISH)
-        publish.send(self, topic=constants.DELEGATE_ACCEPTED_TOPIC, delegate_id=delegate_info['delegate_id'],
+        publish.send(self,
+                     topic=constants.DELEGATE_ACCEPTED_TOPIC,
+                     delegate_id=delegate_info['delegate_id'],
                      peer=delegate_info['peer'])
 
         logging.debug('Running the delegated command.')

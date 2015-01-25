@@ -4,8 +4,11 @@
 
     This file is part of konsensus project.
 """
+import logging
 import argparse
 import tempfile
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 import defaults
 import application
@@ -45,13 +48,11 @@ def make_hdf5(path, dsname):
     ds[...] = np.random.random_integers(1, high=100, size=1000000)
     f.close()
 
-if __name__ == '__main__':
-    """Helper to make konsensus servers with fake data and run them"""
-    parser = argparse.ArgumentParser()
-    parser.add_argument('count', help='Creates a number of Konsensus servers with different datasets')
-    parser.parse_args()
 
-    args = parser.parse_args()
+def instance_factory(count):
+    if count == 0:
+        return
+    """Launch local application instance on random ports"""
     configs = []
     peers = []
     apps = []
@@ -64,28 +65,44 @@ if __name__ == '__main__':
         'PUB_PORT': 9999,  # Will publish all the news on this port.
         'PEERS': [],  # ('127.0.0.1', 9201) Name of peers to subscribe to their publisher port.
         'HDF5_REPO': None})
-    print entry_point_config
     configs.append(entry_point_config)
-    peers.append(('127.0.0.1', entry_point_config.PUB_PORT))
-    for c in xrange(int(args.count)):
-        config = make_config(c+1)
-        peers.append(('127.0.0.1', config.PUB_PORT))
+    peers.append(('127.0.0.1', entry_point_config.PUB_PORT, entry_point_config.API_PORT))
+    for c in xrange(int(count)):
+        config = make_config(c + 1)
+        peers.append(('127.0.0.1', config.PUB_PORT, config.API_PORT))
         configs.append(config)
-        print config
 
     procs = []
     from multiprocessing import Process
+
+    pids = []
     for config in configs:
-        print '*** going to cook an app'
+        logging.debug('*** going to cook an app')
         if config.HDF5_REPO:
             make_hdf5(config.HDF5_REPO, 'ds%s' % config.PEER_ID)
-        config.PEERS = [p for p in peers if p != ('127.0.0.1', config.PUB_PORT)]
+        config.PEERS = [p for p in peers if p != ('127.0.0.1', config.PUB_PORT, config.API_PORT)]
         app = application.KonsensusApp(config.PEER_ID, config=config)
         apps.append(app)
         p = Process(target=app.run)
         procs.append(p)
         p.start()
+        print 'App started.'
+        config.update({'pid': p.pid})
+        pids.append(p.pid)
 
-    for p in procs:
-        p.join()
+    # Let apps finish starting
+    import time
+    time.sleep(.1)
 
+    configs.remove(entry_point_config)
+    return pids, entry_point_config, configs
+
+
+if __name__ == '__main__':
+    """Helper to make konsensus servers with fake data and run them"""
+    parser = argparse.ArgumentParser()
+    parser.add_argument('count', help='Creates a number of Konsensus servers with different datasets')
+    parser.parse_args()
+
+    args = parser.parse_args()
+    instance_factory(args.count)

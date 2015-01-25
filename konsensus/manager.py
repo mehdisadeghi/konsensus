@@ -12,15 +12,17 @@ import gevent
 from blinker import signal
 
 import constants
+from konsensus.store import RandomDatasetStore
+import numpy
 
 
 def delegate(func):
     @functools.wraps(func)
-    def new_func(self, dataset, *args, **kwargs):
+    def new_func(self, dataset, result_ds_name, *args, **kwargs):
         # If the function has already been delegated don't circulate it again.
         if 'is_delegate' in kwargs:
             self.logger.debug('Ignoring delegation try for already delegated request')
-            return func(self, dataset, *args, **kwargs)
+            return func(self, dataset, result_ds_name, *args, **kwargs)
 
         if dataset not in self.local_datasets:
             self.logger.debug('Dataset %s is not available locally, trying to delegate.' % dataset)
@@ -33,6 +35,7 @@ def delegate(func):
                          topic=constants.DELEGATE_TOPIC,
                          command=func.__name__,
                          dataset=dataset,
+                         result_ds_name=result_ds_name,
                          delegate_id=operation_id)
             self.logger.debug('Request for dataset %s published, waiting for someone to answer' % dataset)
 
@@ -47,7 +50,7 @@ def delegate(func):
             accept_signal = signal(constants.PEER_ACCEPTED_DELEGATE_SIG)
             accept_signal.connect(accept_handler)
 
-            gevent.sleep(5)
+            gevent.sleep(3)
 
             def proxy_func(*args, **kwargs):
                 global reply
@@ -57,7 +60,7 @@ def delegate(func):
             # return proxy or call remote and return the result
 
         else:
-            return func(self, dataset, *args, **kwargs)
+            return func(self, dataset, result_ds_name, *args, **kwargs)
     return new_func
 
 
@@ -74,6 +77,7 @@ class KonsensusManager(object):
         self.netmap = {}
         self._topic_handlers = {}
         self._load_datasets()
+        self._store = RandomDatasetStore(config.PEERS)
 
     def _load_datasets(self):
         import h5py
@@ -193,7 +197,7 @@ class KonsensusManager(object):
         return self.config.PEERS
 
     @delegate
-    def use_case_1(self, dataset, *args, **kargs):
+    def use_case_1(self, dataset, result_ds_name, **kwargs):
         """
         Invokes operation for use case 1 described in the report
         :param dataset:
@@ -213,5 +217,43 @@ class KonsensusManager(object):
         for i in xrange(len(result)):
             result[i] = np.mod(result[i], 2)
 
+        # Save into the store
+        self._store.store(result, result_ds_name)
+
         return str(result)
 
+    # def store(self, dataset, dsname):
+    #     """
+    #     Store the given dataset in hdf5 repo
+    #     :param dataset:
+    #     :param dsname:
+    #     :return:
+    #     """
+    #     import numpy
+    #     a = numpy.arange(0.0, 50000000.0)
+    #     return a
+    #     self._store.store(dataset, dsname)
+
+    def recv_array(self, socket, flags=0, copy=True, track=False):
+
+        """recv a numpy array"""
+        md = socket.recv_json(flags=flags)
+        msg = socket.recv(flags=flags, copy=copy, track=track)
+        buf = buffer(msg)
+        A = numpy.frombuffer(buf, dtype=md['dtype'])
+        return A.reshape(md['shape'])
+
+    def pull(self, dsname, endpoint):
+        """
+        Will pull the dataset from the endpoint peer
+        :param dsname:
+        :param endpoint:
+        :return:
+        """
+        logging.debug('Got a pull request for %s and endpoint %s' % (dsname, endpoint))
+        import zmq
+        ctx = zmq.Context()
+        socket = ctx.socket(zmq.PULL)
+        socket.connect(endpoint)
+        work = self.recv_array(socket)
+        logging.debug('Pulled dataset %s from endpoint %s' % (dsname, endpoint))

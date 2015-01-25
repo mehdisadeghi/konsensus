@@ -4,6 +4,7 @@
 
     This file is part of konsensus project.
 """
+import zerorpc
 
 
 class KonsensusAPI(object):
@@ -53,3 +54,16 @@ class KonsensusAPI(object):
 
     def use_case_1(self, dataset, *args, **kargs):
         return self._manager.use_case_1(dataset, *args, **kargs)
+
+    @zerorpc.stream
+    def store(self, *args, **kwargs):
+        """
+        Store the given dataset in the hdf5 repo
+        :param dataset:
+        :param name:
+        :return:
+        """
+        return self._manager.store(*args, **kwargs)
+
+    def pull(self, *args, **kwargs):
+        return self._manager.pull(*args, **kwargs)

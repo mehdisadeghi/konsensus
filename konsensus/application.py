@@ -30,13 +30,13 @@ class KonsensusApp(object):
 
     def _get_logger(self):
         logger = logging.getLogger('%s.%s' % (__name__, self.config.PEER_ID))
-        #logger = logging.getLogger(__name__)
+        #logger.setLevel(logging.CRITICAL)        #logger = logging.getLogger(__name__)
         if logger.handlers:
             return logger
         logger.propagate = False
-        logger.setLevel(logging.DEBUG)
+        #logger.setLevel(logging.CRITICAL)
         ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
+        #ch.setLevel(logging.CRITICAL)
         formatter = logging.Formatter('Peer %s:%s' % (self.config.PEER_ID, logging.BASIC_FORMAT))
         ch.setFormatter(formatter)
         logger.addHandler(ch)
@@ -111,9 +111,9 @@ class KonsensusApp(object):
         socket = context.socket(zmq.SUB)
         socket.setsockopt(zmq.SUBSCRIBE, '')
 
-        for ip, port in self.config.PEERS:
-            if not self._is_self(ip, port):
-                address = '%s:%s' % (ip, port)
+        for ip, pub_port, api_port in self.config.PEERS:
+            if not self._is_self(ip, pub_port):
+                address = '%s:%s' % (ip, pub_port)
                 self.logger.debug('Subscribing to peer at: %s' % address)
                 socket.connect('tcp://%s' % address)
 

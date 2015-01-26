@@ -8,7 +8,11 @@ import logging
 import zmq.green as zmq
 import zerorpc
 import gevent
+
+# Monkey patching msgpack to support numpy arrays
 import msgpack
+#import msgpack_numpy
+#msgpack_numpy.patch()
 
 from blinker import signal
 
@@ -18,9 +22,15 @@ from defaults import DefaultConfig
 from manager import KonsensusManager
 
 
+# Global variable to access current app
+app = None
+
 class KonsensusApp(object):
     def __init__(self, name, host="0.0.0.0", port=None, config=DefaultConfig()):
+        global app
+        app = self
         self.config = config
+        config['HOST'] = host
         self.name = name
         self.host = host
         self.port = port or config.API_PORT

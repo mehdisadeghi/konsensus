@@ -6,9 +6,12 @@
 """
 import logging
 import random
-import zerorpc
-import numpy
-import zmq
+
+import gevent
+import zmq.green as zmq
+
+import constants
+import helpers
 
 
 class RandomDatasetStore(object):
@@ -22,39 +25,29 @@ class RandomDatasetStore(object):
         """
         self.peers = peers
 
-    def send_array(self, socket, A, flags=0, copy=True, track=False):
-        """send a numpy array with metadata"""
-        md = dict(
-            dtype=str(A.dtype),
-            shape=A.shape,
-        )
-        socket.send_json(md, flags | zmq.SNDMORE)
-        return socket.send(A, flags, copy=copy, track=track)
-
     def store(self, dataset, dsname):
         """
         Randomly store the given dataset on one of the network peers.
         :return:
         """
-        logging.debug('Got a store request for %s' % dsname)
-
+        # Publishing a pull request to make other peer ready for pull
         ip, pub_port, api_port = random.choice(self.peers)
-        endpoint = 'tcp://{ip}:{port}'.format(ip=ip, port=api_port)
-        c = zerorpc.Client()
-        c.connect(endpoint)
-        logging.debug('API ready for %s ' % endpoint)
+        target = 'tcp://{ip}:{port}'.format(ip=ip, port=api_port)
 
         ctx = zmq.Context()
         socket = ctx.socket(zmq.PUSH)
+        #TODO: Use streaming and do not recreate new push ports
         temp_port = socket.bind_to_random_port('tcp://127.0.0.1')
-
         print 'temp port is %s' % temp_port
+
+        helpers.publish(self,
+                        topic=constants.PULL_REQUEST_TOPIC,
+                        dataset_name=dsname,
+                        target=(ip, api_port),
+                        endpoint='tcp://127.0.0.1:%s' % temp_port)
+
+        # Let the other peer to catch the signal
+        gevent.sleep(.1)
+
         logging.debug('***Calling send_array')
-        #socket.send_json('A sample text')
-        #self.send_array(socket, dataset, copy=False)
-        #socket.send(dataset)
-        socket.send('Hi')
-        logging.debug('***Calling pull')
-        # Ask the other peer to pull
-        c.pull(dsname, 'tcp://127.0.0.1:%s' % temp_port )
-        logging.debug('Dataset %s transferred to %s' % (dsname, endpoint))
+        helpers.send_array(socket, dataset)

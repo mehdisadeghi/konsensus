@@ -9,9 +9,10 @@ import functools
 import logging
 import gevent
 
-from blinker import signal
+import blinker
 
 import constants
+import helpers
 from konsensus.store import RandomDatasetStore
 import numpy
 
@@ -30,13 +31,12 @@ def delegate(func):
             # Make an id
             operation_id = str(uuid.uuid4())
 
-            publish = signal(constants.PUBLISH)
-            publish.send(self,
-                         topic=constants.DELEGATE_TOPIC,
-                         command=func.__name__,
-                         dataset=dataset,
-                         result_ds_name=result_ds_name,
-                         delegate_id=operation_id)
+            helpers.publish(self,
+                            topic=constants.DELEGATE_TOPIC,
+                            command=func.__name__,
+                            dataset=dataset,
+                            result_ds_name=result_ds_name,
+                            delegate_id=operation_id)
             self.logger.debug('Request for dataset %s published, waiting for someone to answer' % dataset)
 
             global reply
@@ -47,7 +47,7 @@ def delegate(func):
                 global reply
                 reply = info
 
-            accept_signal = signal(constants.PEER_ACCEPTED_DELEGATE_SIG)
+            accept_signal = blinker.signal(constants.PEER_ACCEPTED_DELEGATE_SIG)
             accept_signal.connect(accept_handler)
 
             gevent.sleep(3)
@@ -85,7 +85,17 @@ class KonsensusManager(object):
             f = h5py.File(self.config.HDF5_REPO, 'r')
             for key, value in f.iteritems():
                 if isinstance(value, h5py.Dataset):
-                    self.local_datasets[key] = {'array size': value.size}
+                    self._add_dataset(key, value)
+            f.close()
+
+    def _add_dataset(self, key, dataset):
+        """
+        Adds an h5py dataset to local dataset list
+        :param key:
+        :param dataset:
+        :return:
+        """
+        self.local_datasets[key] = {'array size': dataset.size}
 
     def _default_handler(self, topic, messages):
         """
@@ -152,7 +162,7 @@ class KonsensusManager(object):
             raise Exception('Operation is already submitted.')
 
         self.logger.debug('Recieved a new operation request, signaling.')
-        sig = signal('operation.new')
+        sig = blinker.signal('operation.new')
         sig.send(self, op_name=name)
         self.ops[name] = name
 
@@ -216,40 +226,20 @@ class KonsensusManager(object):
         result = np.array(f.get(dataset))
         for i in xrange(len(result)):
             result[i] = np.mod(result[i], 2)
-
+        f.close()
         # Save into the store
         self._store.store(result, result_ds_name)
 
         return str(result)
 
-    # def store(self, dataset, dsname):
-    #     """
-    #     Store the given dataset in hdf5 repo
-    #     :param dataset:
-    #     :param dsname:
-    #     :return:
-    #     """
-    #     import numpy
-    #     a = numpy.arange(0.0, 50000000.0)
-    #     return a
-    #     self._store.store(dataset, dsname)
-
-    def recv_array(self, socket, flags=0, copy=True, track=False):
-
-        """recv a numpy array"""
-        md = socket.recv_json(flags=flags)
-        msg = socket.recv(flags=flags, copy=copy, track=track)
-        buf = buffer(msg)
-        A = numpy.frombuffer(buf, dtype=md['dtype'])
-        return A.reshape(md['shape'])
-
-    def pull(self, dsname, endpoint):
+    def pull_request(self, dsname, endpoint):
         """
         Will pull the dataset from the endpoint peer
         :param dsname:
         :param endpoint:
         :return:
         """
+        helpers.whoami(self.config)
         logging.debug('Got a pull request for %s and endpoint %s' % (dsname, endpoint))
         import zmq
         ctx = zmq.Context()
@@ -257,3 +247,21 @@ class KonsensusManager(object):
         socket.connect(endpoint)
         work = self.recv_array(socket)
         logging.debug('Pulled dataset %s from endpoint %s' % (dsname, endpoint))
+
+    def store_array(self, array, name):
+        """
+        Store the given numpy array into hdf5 repo
+        :param dataset:
+        :param name:
+        :return:
+        """
+        if name in self.local_datasets:
+            logging.warning('Going to override dataset %s' % name)
+        import h5py
+        helpers.whoami(self.config)
+        logging.debug('Opening hdf5 repo %s' % self.config.HDF5_REPO)
+        f = h5py.File(self.config.HDF5_REPO, 'r+')
+        ds = f.create_dataset(name, array.shape, array.dtype)
+        ds[...] = array
+        self._add_dataset(name, ds)
+        f.close()

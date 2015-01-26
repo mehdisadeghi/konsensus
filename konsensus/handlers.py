@@ -7,9 +7,12 @@
 import socket
 import logging
 
-from blinker import signal
+import zmq.green as zmq
+import msgpack
+import blinker
 
 import constants
+import helpers
 
 
 class ZMQTopicHandlerBase(object):
@@ -51,11 +54,10 @@ class DelegateTopicHandler(ZMQTopicHandlerBase):
         delegate_info['peer'] = socket.gethostname()
 
         # Inform other peers that we take care of the operation
-        publish = signal(constants.PUBLISH)
-        publish.send(self,
-                     topic=constants.DELEGATE_ACCEPTED_TOPIC,
-                     delegate_id=delegate_info['delegate_id'],
-                     peer=delegate_info['peer'])
+        helpers.publish(self,
+                        topic=constants.DELEGATE_ACCEPTED_TOPIC,
+                        delegate_id=delegate_info['delegate_id'],
+                        peer=delegate_info['peer'])
 
         logging.debug('Running the delegated command.')
         #TODO: A central service repository is required
@@ -83,5 +85,36 @@ class DelegateAcceptedTopicHandler(ZMQTopicHandlerBase):
         logging.debug('Got a delegate accepted handle request for message %s' % info)
 
         # Signaling the interested parties about it
-        accept_signal = signal(constants.PEER_ACCEPTED_DELEGATE_SIG)
+        accept_signal = blinker.signal(constants.PEER_ACCEPTED_DELEGATE_SIG)
         accept_signal.send(self, info=info)
+
+
+class PullRequestTopicHandler(ZMQTopicHandlerBase):
+    def __init__(self):
+        ZMQTopicHandlerBase.__init__(self)
+
+    def get_topic(self):
+        return constants.PULL_REQUEST_TOPIC
+
+    def handle(self, manager, info):
+        """
+
+        :param manager:
+        :param info:
+        :return:
+        """
+        # Check if I should handle this
+        target_ip, target_port = info['target']
+        if not helpers.is_running_instance(manager.config, target_ip, target_port):
+            logging.debug('Ignoring a pull request which is not for us')
+            return
+        logging.debug('Connecting to the peer to pull dataset %s' % info['dataset_name'])
+        ctx = zmq.Context()
+        socket = ctx.socket(zmq.PULL)
+        socket.connect(info['endpoint'])
+        #dataset = socket.recv()
+        array = helpers.recv_array(socket)
+        logging.debug('Fetching finished, going to unpack and save dataset.')
+        manager.store_array(array, info['dataset_name'])
+        # Unpack
+        #unpacked = msgpack.unpackb(dataset)

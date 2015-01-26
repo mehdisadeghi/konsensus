@@ -64,7 +64,8 @@ def instance_factory(count):
         'API_PORT': 9998,  # API port. Application will listen for incoming requests
         'PUB_PORT': 9999,  # Will publish all the news on this port.
         'PEERS': [],  # ('127.0.0.1', 9201) Name of peers to subscribe to their publisher port.
-        'HDF5_REPO': None})
+    #    'HDF5_REPO': None
+    })
     configs.append(entry_point_config)
     peers.append(('127.0.0.1', entry_point_config.PUB_PORT, entry_point_config.API_PORT))
     for c in xrange(int(count)):

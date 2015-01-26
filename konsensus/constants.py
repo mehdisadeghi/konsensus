@@ -29,3 +29,6 @@ PEER_ACCEPTED_DELEGATE_SIG = 'peer.accepted.delegate'
 
 # Shout over the network
 PUBLISH = 'publish'
+
+# Pull requests
+PULL_REQUEST_TOPIC = 10016

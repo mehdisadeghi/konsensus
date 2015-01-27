@@ -67,3 +67,11 @@ class KonsensusAPI(object):
 
     # def pull_request(self, *args, **kwargs):
     #     return self._manager.pull_request(*args, **kwargs)
+
+    def list(self, command):
+        """
+        Return a list of datasets or peers
+        :param command: "data" or "peers"
+        :return:
+        """
+        return self._manager.list(command)

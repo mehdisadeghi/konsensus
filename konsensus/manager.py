@@ -255,13 +255,35 @@ class KonsensusManager(object):
         :param name:
         :return:
         """
-        if name in self.local_datasets:
-            self.logger.warning('Going to override dataset %s' % name)
-        import h5py
         helpers.whoami(self.config)
         self.logger.debug('Opening hdf5 repo %s' % self.config.HDF5_REPO)
         f = h5py.File(self.config.HDF5_REPO, 'r+')
-        ds = f.create_dataset(name, array.shape, array.dtype)
+        ds = None
+        if name in self.local_datasets:
+            self.logger.warning('Going to override dataset %s' % name)
+            ds = f[name]
+        else:
+            ds = f.create_dataset(name, array.shape, array.dtype)
         ds[...] = array
         self._add_dataset(name, ds)
         f.close()
+
+    def list(self, command):
+        """
+        List datasets or peers
+        :param command:
+        :return:
+        """
+        import zerorpc
+        if command in ('data', 'datasets'):
+            datasets = {}
+            for peer_ip, pub_port, api_port in self.config.PEERS:
+                key = '%s:%s' % (peer_ip, api_port)
+                datasets[key] = []
+                c = zerorpc.Client()
+                c.connect('tcp://%s:%s' % (peer_ip, api_port))
+                datasets[key].append(c.get_dataset_map())
+            return datasets
+
+        if command in ('peer', 'peers'):
+            return self.config.PEERS

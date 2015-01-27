@@ -4,11 +4,11 @@
 
     This file is part of konsensus project.
 """
-import logging
 import argparse
 import tempfile
 import logging
-logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
+#logger = logging.getLogger(__name__)
 
 import defaults
 import application
@@ -36,7 +36,8 @@ def make_config(id):
         'API_PORT': api_port,  # API port. Application will listen for incoming requests
         'PUB_PORT': pub_port,  # Will publish all the news on this port.
         'PEERS': [],  # ('127.0.0.1', 9201) Name of peers to subscribe to their publisher port.
-        'HDF5_REPO': loc
+        'HDF5_REPO': loc,
+        'LOG_LEVEL': 'DEBUG'
         })
     return config
 
@@ -49,13 +50,18 @@ def make_hdf5(path, dsname):
     f.close()
 
 
+def _cook_and_run(config=None):
+    app = application.KonsensusApp(config.PEER_ID, config=config)
+    app.run()
+
+
 def instance_factory(count):
     if count == 0:
         return
     """Launch local application instance on random ports"""
     configs = []
     peers = []
-    apps = []
+    #apps = []
 
     # Make an entry point node for sake of simplicity and ease of use
     entry_point_config = make_config(0)
@@ -73,21 +79,22 @@ def instance_factory(count):
         peers.append(('127.0.0.1', config.PUB_PORT, config.API_PORT))
         configs.append(config)
 
-    procs = []
+    #procs = []
     from multiprocessing import Process
 
     pids = []
     for config in configs:
-        logging.debug('*** going to cook an app')
+        #logger.info('Going to cook an app #%s' % config.PEER_ID)
         if config.HDF5_REPO:
             make_hdf5(config.HDF5_REPO, 'ds%s' % config.PEER_ID)
         config.PEERS = [p for p in peers if p != ('127.0.0.1', config.PUB_PORT, config.API_PORT)]
-        app = application.KonsensusApp(config.PEER_ID, config=config)
-        apps.append(app)
-        p = Process(target=app.run)
-        procs.append(p)
+        #app = application.KonsensusApp(config.PEER_ID, config=config)
+        #apps.append(app)
+        #p = Process(target=app.run)
+        p = Process(target=_cook_and_run, kwargs={'config': config})
+        #procs.append(p)
         p.start()
-        print 'App started.'
+        #logger.info('App #%s started.' % config.PEER_ID)
         config.update({'pid': p.pid})
         pids.append(p.pid)
 

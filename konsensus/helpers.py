@@ -13,6 +13,8 @@ import numpy
 
 import constants
 
+logger = logging.getLogger(__name__)
+
 
 def publish(sender, **kwargs):
     """
@@ -34,12 +36,7 @@ def is_running_instance(config, ip, port):
     :return:
     """
     local_ip = socket.gethostbyname(socket.gethostname())
-    if ip in (local_ip, '127.0.0.1', 'localhost') and port == config.API_PORT:
-        print 'accepted', ip, port
-        return True
-    else:
-        print 'rejected. Given ', ip, port, ' my info: ', local_ip, config.API_PORT
-        return False
+    return ip in (local_ip, '127.0.0.1', 'localhost') and port == config.API_PORT
 
 
 def send_array(socket, A, flags=0, copy=True, track=False):
@@ -62,4 +59,4 @@ def recv_array(socket, flags=0, copy=True, track=False):
 
 
 def whoami(config):
-    logging.debug('I am konsensus instance at %s:%s' % (config.HOST, config.API_PORT))
+    logger.debug('I am konsensus instance at %s:%s' % (config.HOST, config.API_PORT))

@@ -4,16 +4,14 @@
 
     This file is part of konsensus project.
 """
-import logging
-import zmq.green as zmq
-import zerorpc
 import gevent
 
+import zmq.green as zmq
+import zerorpc
 # Monkey patching msgpack to support numpy arrays
 import msgpack
 #import msgpack_numpy
 #msgpack_numpy.patch()
-
 from blinker import signal
 
 import constants
@@ -25,6 +23,7 @@ from manager import KonsensusManager
 # Global variable to access current app
 app = None
 
+
 class KonsensusApp(object):
     def __init__(self, name, host="0.0.0.0", port=None, config=DefaultConfig()):
         global app
@@ -35,22 +34,26 @@ class KonsensusApp(object):
         self.host = host
         self.port = port or config.API_PORT
         self.manager = None
-        self.logger = self._get_logger()
-        logging.basicConfig(level=logging.DEBUG)
+        #self.logger = self._get_logger()
+        import logging
+        self.logger = logging.getLogger(__name__)
 
-    def _get_logger(self):
-        logger = logging.getLogger('%s.%s' % (__name__, self.config.PEER_ID))
-        #logger.setLevel(logging.CRITICAL)        #logger = logging.getLogger(__name__)
-        if logger.handlers:
-            return logger
-        logger.propagate = False
-        #logger.setLevel(logging.CRITICAL)
-        ch = logging.StreamHandler()
-        #ch.setLevel(logging.CRITICAL)
-        formatter = logging.Formatter('Peer %s:%s' % (self.config.PEER_ID, logging.BASIC_FORMAT))
-        ch.setFormatter(formatter)
-        logger.addHandler(ch)
-        return logger
+    # def _get_logger(self):
+    #     import logging
+    #     # Make unique names to avoid logging problems in multiprocess tests
+    #     #logger = logging.getLogger('%s. #%s' % (__name__, self.config.PEER_ID))
+    #     logger = logging.getLogger(__name__)
+    #     if logger.handlers:
+    #         return logger
+    #     logger.propagate = False
+    #     #logger.setLevel(logging.CRITICAL)
+    #     ch = logging.StreamHandler()
+    #     #ch.setLevel(logging.CRITICAL)
+    #     #formatter = logging.Formatter('Peer #%s:%s' % (self.config.PEER_ID, logging.BASIC_FORMAT))
+    #     formatter = logging.Formatter('Pid:%(process)d:%(name)s:%(message)s')
+    #     ch.setFormatter(formatter)
+    #     logger.addHandler(ch)
+    #     return logger
 
     def _register_handlers(self, manager):
         """
@@ -97,7 +100,8 @@ class KonsensusApp(object):
         def publish_handler(sender, topic=None, **kwargs):
             if not topic:
                 raise Exception("No topic given. Won't publish anything without it.")
-            self.logger.debug('Got a publish request with topic %s and keywords: %s' % (topic, kwargs))
+            self.logger.debug('Got a publish request for topic %s:%s' %
+                              (topic, constants.topics.get(topic)))
 
             packed = msgpack.packb(kwargs)
             socket.send('%s %s' % (topic, packed))
@@ -132,7 +136,8 @@ class KonsensusApp(object):
             topic, delimiter, packed = msg.partition(' ')
             topic = int(topic)
             message_dict = msgpack.unpackb(packed)
-            self.logger.debug('News for topic %s, msg: %s' % (topic, message_dict))
+            self.logger.debug('News for topic %s:%s arrived' %
+                              (topic, constants.topics.get(topic)))
             self.manager.handle_topic(topic, message_dict)
 
         sig = signal(constants.NEW_MESSAGE_TOPIC)

@@ -6,15 +6,17 @@
 """
 import uuid
 import functools
-import logging
 import gevent
+import socket
 
 import blinker
+import h5py
+import numpy as np
+#import zmq.green as zmq
 
 import constants
 import helpers
 from konsensus.store import RandomDatasetStore
-import numpy
 
 
 def delegate(func):
@@ -43,7 +45,7 @@ def delegate(func):
             reply = None
 
             def accept_handler(sender, info=None):
-                self.logger.debug('Delegate request for dataset %s accepted with this info: %s' % (dataset, info))
+                self.logger.debug('Delegate request for dataset %s accepted' % dataset)
                 global reply
                 reply = info
 
@@ -69,6 +71,7 @@ class KonsensusManager(object):
     Implements the logic.
     """
     def __init__(self, config):
+        import logging
         self.logger = logging.getLogger(__name__)
         self.config = config
         self.local_datasets = {}
@@ -213,9 +216,7 @@ class KonsensusManager(object):
         :param dataset:
         :return:
         """
-        import socket
-        import h5py
-        import numpy as np
+
         hostname = socket.gethostname()
         self.logger.debug('Request for use case 1 with dataset name %s at host %s received' % (dataset, hostname))
 
@@ -232,21 +233,20 @@ class KonsensusManager(object):
 
         return str(result)
 
-    def pull_request(self, dsname, endpoint):
-        """
-        Will pull the dataset from the endpoint peer
-        :param dsname:
-        :param endpoint:
-        :return:
-        """
-        helpers.whoami(self.config)
-        logging.debug('Got a pull request for %s and endpoint %s' % (dsname, endpoint))
-        import zmq
-        ctx = zmq.Context()
-        socket = ctx.socket(zmq.PULL)
-        socket.connect(endpoint)
-        work = self.recv_array(socket)
-        logging.debug('Pulled dataset %s from endpoint %s' % (dsname, endpoint))
+    # def pull_request(self, dsname, endpoint):
+    #     """
+    #     Will pull the dataset from the endpoint peer
+    #     :param dsname:
+    #     :param endpoint:
+    #     :return:
+    #     """
+    #     helpers.whoami(self.config)
+    #     logging.debug('Got a pull request for %s and endpoint %s' % (dsname, endpoint))
+    #     ctx = zmq.Context()
+    #     socket = ctx.socket(zmq.PULL)
+    #     socket.connect(endpoint)
+    #     work = self.recv_array(socket)
+    #     logging.debug('Pulled dataset %s from endpoint %s' % (dsname, endpoint))
 
     def store_array(self, array, name):
         """
@@ -256,10 +256,10 @@ class KonsensusManager(object):
         :return:
         """
         if name in self.local_datasets:
-            logging.warning('Going to override dataset %s' % name)
+            self.logger.warning('Going to override dataset %s' % name)
         import h5py
         helpers.whoami(self.config)
-        logging.debug('Opening hdf5 repo %s' % self.config.HDF5_REPO)
+        self.logger.debug('Opening hdf5 repo %s' % self.config.HDF5_REPO)
         f = h5py.File(self.config.HDF5_REPO, 'r+')
         ds = f.create_dataset(name, array.shape, array.dtype)
         ds[...] = array

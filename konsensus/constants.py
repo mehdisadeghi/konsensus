@@ -5,6 +5,15 @@
     This file is part of konsensus project.
 """
 
+# Human readable topics
+topics = {10010: 'hearbeat',
+          10011: 'new message',
+          10012: 'new dataset',
+          10013: 'new operation',
+          10014: 'delegate',
+          10015: 'delegate accepted',
+          10016: 'pull request'}
+
 # For heartbeat messages
 HEARTBEAT_TOPIC = 10010
 

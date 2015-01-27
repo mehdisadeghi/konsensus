@@ -5,7 +5,6 @@
     This file is part of konsensus project.
 """
 import socket
-import logging
 
 import zmq.green as zmq
 import msgpack
@@ -16,6 +15,10 @@ import helpers
 
 
 class ZMQTopicHandlerBase(object):
+    def __init__(self):
+        object.__init__(self)
+        import logging
+        self.logger = logging.getLogger(__name__)
 
     def get_topic(self):
         return NotImplementedError()
@@ -32,19 +35,19 @@ class DelegateTopicHandler(ZMQTopicHandlerBase):
         return constants.DELEGATE_TOPIC
 
     def handle(self, manager, delegate_info):
-        logging.debug('Got a delegate handle request for message %s' % delegate_info)
+        self.logger.debug('Got a delegate handle request')
 
         # Check data availability
         if not manager.has_dataset(delegate_info['dataset']):
             # Don't need to do anything, pass with a message
-            logging.debug('Ignoring a request for %s on dataset %s because we do not have the data' % (delegate_info['command'],
-                                                                       delegate_info['dataset']))
+            self.logger.debug('Ignoring %s, no dataset %s' % (delegate_info['command'],
+                                                              delegate_info['dataset']))
             return
 
         # Check command availability
         if not manager.has_command(delegate_info['command']):
             # Have the data but not the command
-            logging.debug('Ignoring a request for %s on dataset %s. The command is not available' %
+            self.logger.debug('Ignoring a request for %s on dataset %s. The command is not available' %
                           (delegate_info['command'],
                            delegate_info['dataset']))
             return
@@ -59,7 +62,7 @@ class DelegateTopicHandler(ZMQTopicHandlerBase):
                         delegate_id=delegate_info['delegate_id'],
                         peer=delegate_info['peer'])
 
-        logging.debug('Running the delegated command.')
+        self.logger.debug('Running the delegated command.')
         #TODO: A central service repository is required
         func = getattr(manager, delegate_info['command'])
         dataset = delegate_info['dataset']
@@ -67,7 +70,7 @@ class DelegateTopicHandler(ZMQTopicHandlerBase):
         #TODO: It should be done without this flag here
         delegate_info['is_delegate'] = True
         result = func(dataset, **delegate_info)
-        logging.debug('Delegated command finished with result: %s' % result)
+        self.logger.debug('Delegated command finished with result: %s' % result)
 
         # # Also inform other parts of the app about accepting
         # accept_signal = signal(constants.DELEGATE_ACCEPTED_SIG)
@@ -82,7 +85,7 @@ class DelegateAcceptedTopicHandler(ZMQTopicHandlerBase):
         return constants.DELEGATE_ACCEPTED_TOPIC
 
     def handle(self, manager, info):
-        logging.debug('Got a delegate accepted handle request for message %s' % info)
+        self.logger.debug('Got a delegate accepted handle request')
 
         # Signaling the interested parties about it
         accept_signal = blinker.signal(constants.PEER_ACCEPTED_DELEGATE_SIG)
@@ -106,15 +109,15 @@ class PullRequestTopicHandler(ZMQTopicHandlerBase):
         # Check if I should handle this
         target_ip, target_port = info['target']
         if not helpers.is_running_instance(manager.config, target_ip, target_port):
-            logging.debug('Ignoring a pull request which is not for us')
+            self.logger.debug('Ignoring a pull request which is not for us')
             return
-        logging.debug('Connecting to the peer to pull dataset %s' % info['dataset_name'])
+            self.logger.debug('Connecting to the peer to pull dataset %s' % info['dataset_name'])
         ctx = zmq.Context()
         socket = ctx.socket(zmq.PULL)
         socket.connect(info['endpoint'])
         #dataset = socket.recv()
         array = helpers.recv_array(socket)
-        logging.debug('Fetching finished, going to unpack and save dataset.')
+        self.logger.debug('Fetching finished, going to unpack and save dataset.')
         manager.store_array(array, info['dataset_name'])
         # Unpack
         #unpacked = msgpack.unpackb(dataset)

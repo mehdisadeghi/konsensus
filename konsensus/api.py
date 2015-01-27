@@ -65,5 +65,5 @@ class KonsensusAPI(object):
         """
         return self._manager.store(*args, **kwargs)
 
-    def pull_request(self, *args, **kwargs):
-        return self._manager.pull_request(*args, **kwargs)
+    # def pull_request(self, *args, **kwargs):
+    #     return self._manager.pull_request(*args, **kwargs)

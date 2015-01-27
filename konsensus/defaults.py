@@ -15,7 +15,8 @@ class DefaultConfig(dict):
             # Name of peers to subscribe to. Will not publish to self.
             'PEERS': [('153.96.75.60', 4201, 4200),
                       ('153.96.74.161', 4201, 4200)],
-            'HDF5_REPO': '/W5/sade/workspace/hdf5_samples/usecase1.h5'
+            'HDF5_REPO': '/W5/sade/workspace/hdf5_samples/usecase1.h5',
+            'LOG_LEVEL': 'DEBUG'
         })
 
     def __getattr__(self, item):

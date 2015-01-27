@@ -4,7 +4,6 @@
 
     This file is part of konsensus project.
 """
-import logging
 import random
 
 import gevent
@@ -24,6 +23,8 @@ class RandomDatasetStore(object):
         :return:
         """
         self.peers = peers
+        import logging
+        self.logger = logging.getLogger(__name__)
 
     def store(self, dataset, dsname):
         """
@@ -38,7 +39,7 @@ class RandomDatasetStore(object):
         socket = ctx.socket(zmq.PUSH)
         #TODO: Use streaming and do not recreate new push ports
         temp_port = socket.bind_to_random_port('tcp://127.0.0.1')
-        print 'temp port is %s' % temp_port
+        self.logger.debug('Opened the pull port at %s' % temp_port)
 
         helpers.publish(self,
                         topic=constants.PULL_REQUEST_TOPIC,
@@ -49,5 +50,5 @@ class RandomDatasetStore(object):
         # Let the other peer to catch the signal
         gevent.sleep(.1)
 
-        logging.debug('***Calling send_array')
+        self.logger.debug('Calling send_array')
         helpers.send_array(socket, dataset)

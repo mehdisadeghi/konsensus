@@ -4,66 +4,15 @@
 
     This file is part of konsensus project.
 """
-import uuid
-import functools
-import gevent
 import socket
 
 import blinker
 import h5py
 import numpy as np
-#import zmq.green as zmq
 
-import constants
 import helpers
-from konsensus.store import RandomDatasetStore
-
-
-def delegate(func):
-    @functools.wraps(func)
-    def new_func(self, dataset, result_ds_name, *args, **kwargs):
-        # If the function has already been delegated don't circulate it again.
-        if 'is_delegate' in kwargs:
-            self.logger.debug('Ignoring delegation try for already delegated request')
-            return func(self, dataset, result_ds_name, *args, **kwargs)
-
-        if dataset not in self.local_datasets:
-            self.logger.debug('Dataset %s is not available locally, trying to delegate.' % dataset)
-
-            # Make an id
-            operation_id = str(uuid.uuid4())
-
-            helpers.publish(self,
-                            topic=constants.DELEGATE_TOPIC,
-                            command=func.__name__,
-                            dataset=dataset,
-                            result_ds_name=result_ds_name,
-                            delegate_id=operation_id)
-            self.logger.debug('Request for dataset %s published, waiting for someone to answer' % dataset)
-
-            global reply
-            reply = None
-
-            def accept_handler(sender, info=None):
-                self.logger.debug('Delegate request for dataset %s accepted' % dataset)
-                global reply
-                reply = info
-
-            accept_signal = blinker.signal(constants.PEER_ACCEPTED_DELEGATE_SIG)
-            accept_signal.connect(accept_handler)
-
-            gevent.sleep(3)
-
-            def proxy_func(*args, **kwargs):
-                global reply
-                if reply:
-                    return 'You request with id %s is delivered to peer %s' % (reply['delegate_id'], reply['peer'])
-            return proxy_func()
-            # return proxy or call remote and return the result
-
-        else:
-            return func(self, dataset, result_ds_name, *args, **kwargs)
-    return new_func
+import decorators
+from konsensus.store import RandomDatasetStore, DistributedOperationStore
 
 
 class KonsensusManager(object):
@@ -75,12 +24,9 @@ class KonsensusManager(object):
         self.logger = logging.getLogger(__name__)
         self.config = config
         self.local_datasets = {}
-        self.peers = {}
-        self.ops = {}
-        self.netmap = {}
-        self._topic_handlers = {}
         self._load_datasets()
         self._store = RandomDatasetStore(config.PEERS)
+        self._operation_store = DistributedOperationStore(self)
 
     def _load_datasets(self):
         import h5py
@@ -100,45 +46,38 @@ class KonsensusManager(object):
         """
         self.local_datasets[key] = {'array size': dataset.size}
 
-    def _default_handler(self, topic, messages):
+    def get_operation_store(self):
         """
-        Default handler for any message type
-        :param topic:
-        :param messages:
+        Returns operation store
         :return:
         """
-        self.logger.error('No handler assigned for topic %s' % topic)
+        return self._operation_store
 
-    def register_handler(self, topic, handler):
+    def get_dataset(self, dataset_id, *args, **kwargs):
         """
-        Register a function to handle a zmq topic message
-        :param topic:
-        :param handler:
-        :return:
+        Get a specifc dataset
+        :param dataset_id: dataset id
+        :return: np.array
         """
-        if topic in self._topic_handlers:
-            self._topic_handlers.append(handler)
-        else:
-            self._topic_handlers[topic] = [handler]
+        f = h5py.File(self.config.HDF5_REPO, 'r')
+        #if dataset_id not in self.local_datasets:
+        if dataset_id not in f:
+            raise Exception('Dataset %s is not available in local repository' % dataset_id)
 
-    def hello(self, name, *args, **kwargs):
-        """
-        Greeting.
-        :param name:
-        :param args:
-        :param kwargs:
-        :return:
-        """
-        return "Hello {0}. I am Konsensus #{1}".format(name, 1)
+        return np.array(f.get(dataset_id))
 
-    def get_peers(self, *args, **kwargs):
-        """
-        Returns a list of peers
-        :return:
-        """
-        self.peers.update({'tcp://127.0.0.1:4200':
-                               {'id': 'Fake', 'address': 'Fake', 'status': 'Fake'}})
-        return self.peers
+    # def run_operation(self, name, *args, **kwargs):
+    #     """
+    #     To run an op
+    #     :return:
+    #     """
+    #     if name in self.ops:
+    #         raise Exception('Operation is already submitted.')
+    #
+    #     self.logger.debug('Received a new operation request, signaling.')
+    #     sig = blinker.signal('operation.new')
+    #     sig.send(self, op_name=name)
+    #     self.ops[name] = name
 
     def get_dataset_map(self, *args, **kwargs):
         """
@@ -147,47 +86,12 @@ class KonsensusManager(object):
         """
         return self.local_datasets
 
-    def get_dataset(self, key, *args, **kwargs):
+    def get_operations(self):
         """
-        Get a specifc dataset
-        :param key:
+        Get the current operation list (in memory)
         :return:
         """
-        if key in self.local_datasets:
-            return self.local_datasets[key]
-
-    def run_operation(self, name, *args, **kwargs):
-        """
-        To run an op
-        :return:
-        """
-        if name in self.ops:
-            raise Exception('Operation is already submitted.')
-
-        self.logger.debug('Recieved a new operation request, signaling.')
-        sig = blinker.signal('operation.new')
-        sig.send(self, op_name=name)
-        self.ops[name] = name
-
-    def get_commands(self):
-        return self.ops
-
-    def get_net_map(self):
-        return self.netmap
-
-    def handle_topic(self, topic, messages):
-        """
-        Lookup topic handler and call them
-        :param topic:
-        :param messages:
-        :return:
-        """
-        #logging.debug('Manager: got a handling request for topic %s. Registered handlers: %s' % (topic, self._topic_handlers))
-        if topic not in self._topic_handlers:
-            return self._default_handler(topic, messages)
-        else:
-            for handler in self._topic_handlers[topic]:
-                handler.handle(self, messages)
+        return self._operation_store
 
     def has_dataset(self, dataset):
         """
@@ -209,7 +113,7 @@ class KonsensusManager(object):
         """Returns the peers"""
         return self.config.PEERS
 
-    @delegate
+    @decorators.delegate
     def use_case_1(self, dataset, result_ds_name, **kwargs):
         """
         Invokes operation for use case 1 described in the report
@@ -229,24 +133,31 @@ class KonsensusManager(object):
             result[i] = np.mod(result[i], 2)
         f.close()
         # Save into the store
-        self._store.store(result, result_ds_name)
+        self._store.store(result, dataset_id=result_ds_name)
 
         return str(result)
 
-    # def pull_request(self, dsname, endpoint):
-    #     """
-    #     Will pull the dataset from the endpoint peer
-    #     :param dsname:
-    #     :param endpoint:
-    #     :return:
-    #     """
-    #     helpers.whoami(self.config)
-    #     logging.debug('Got a pull request for %s and endpoint %s' % (dsname, endpoint))
-    #     ctx = zmq.Context()
-    #     socket = ctx.socket(zmq.PULL)
-    #     socket.connect(endpoint)
-    #     work = self.recv_array(socket)
-    #     logging.debug('Pulled dataset %s from endpoint %s' % (dsname, endpoint))
+    def use_case_2(self, first_id, second_id, **kwargs):
+        """
+        A linear operation on first and second datasets.
+        :param first_id: first dataset id
+        :param second_id: second dataset id
+        :returns:
+        """
+        first_array = self.get_dataset(first_id)
+        second_array = self.get_dataset(second_id)
+        if first_array.size != second_array.size:
+            return Exception('Datasets should be of the same size')
+        result = []
+        for i in xrange(first_array.size):
+            result.append(first_array[i] + second_array[i])
+
+        npresult = np.array(result)
+        dataset_id = self._store.store(npresult)
+
+    @decorators.register
+    def dummy(self):
+        pass
 
     def store_array(self, array, name):
         """
@@ -274,6 +185,7 @@ class KonsensusManager(object):
         :param command:
         :return:
         """
+        #TODO: Use a proper command registration technique
         import zerorpc
         if command in ('data', 'datasets'):
             datasets = {}
@@ -285,5 +197,11 @@ class KonsensusManager(object):
                 datasets[key].append(c.get_dataset_map())
             return datasets
 
-        if command in ('peer', 'peers'):
+        elif command == 'peers':
             return self.config.PEERS
+
+        elif command == 'operations':
+            return self.get_operations()
+
+        else:
+            return Exception('Not implemented command: %s' % command)

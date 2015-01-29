@@ -16,13 +16,15 @@ import constants
 logger = logging.getLogger(__name__)
 
 
-def publish(sender, **kwargs):
+def publish(sender, topic, **kwargs):
     """
     Send a publish request
     :param sender:
+    :param topic:
     :param kwargs:
     :return:
     """
+    kwargs['topic'] = topic
     publish_signal = blinker.signal(constants.PUBLISH)
     publish_signal.send(sender, **kwargs)
 

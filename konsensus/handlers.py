@@ -7,7 +7,6 @@
 import socket
 
 import zmq.green as zmq
-import msgpack
 import blinker
 
 import constants
@@ -23,13 +22,14 @@ class ZMQTopicHandlerBase(object):
     def get_topic(self):
         return NotImplementedError()
 
-    def handle(self, *args, **kwargs):
+    def handle(self, manager, message_dict):
         return NotImplementedError
 
 
 class DelegateTopicHandler(ZMQTopicHandlerBase):
-    def __init__(self):
-        ZMQTopicHandlerBase.__init__(self)
+    """
+    Responsible to handle delegation news.
+    """
 
     def get_topic(self):
         return constants.DELEGATE_TOPIC
@@ -53,12 +53,11 @@ class DelegateTopicHandler(ZMQTopicHandlerBase):
             return
 
         # Adding host info to the delegate_info
-
         delegate_info['peer'] = socket.gethostname()
 
         # Inform other peers that we take care of the operation
         helpers.publish(self,
-                        topic=constants.DELEGATE_ACCEPTED_TOPIC,
+                        constants.DELEGATE_ACCEPTED_TOPIC,
                         delegate_id=delegate_info['delegate_id'],
                         peer=delegate_info['peer'])
 
@@ -72,14 +71,11 @@ class DelegateTopicHandler(ZMQTopicHandlerBase):
         result = func(dataset, **delegate_info)
         self.logger.debug('Delegated command finished with result: %s' % result)
 
-        # # Also inform other parts of the app about accepting
-        # accept_signal = signal(constants.DELEGATE_ACCEPTED_SIG)
-        # accept_signal.send(self, id=delegate_info['id'])
-
 
 class DelegateAcceptedTopicHandler(ZMQTopicHandlerBase):
-    def __init__(self):
-        ZMQTopicHandlerBase.__init__(self)
+    """
+    Responsible to handle delegation accepted news.
+    """
 
     def get_topic(self):
         return constants.DELEGATE_ACCEPTED_TOPIC
@@ -93,9 +89,9 @@ class DelegateAcceptedTopicHandler(ZMQTopicHandlerBase):
 
 
 class PullRequestTopicHandler(ZMQTopicHandlerBase):
-    def __init__(self):
-        ZMQTopicHandlerBase.__init__(self)
-
+    """
+    Responsible to handle pull request news
+    """
     def get_topic(self):
         return constants.PULL_REQUEST_TOPIC
 
@@ -113,11 +109,28 @@ class PullRequestTopicHandler(ZMQTopicHandlerBase):
             return
             self.logger.debug('Connecting to the peer to pull dataset %s' % info['dataset_name'])
         ctx = zmq.Context()
-        socket = ctx.socket(zmq.PULL)
-        socket.connect(info['endpoint'])
-        #dataset = socket.recv()
-        array = helpers.recv_array(socket)
+        pull_socket = ctx.socket(zmq.PULL)
+        pull_socket.connect(info['endpoint'])
+        array = helpers.recv_array(pull_socket)
         self.logger.debug('Fetching finished, going to unpack and save dataset.')
         manager.store_array(array, info['dataset_name'])
-        # Unpack
-        #unpacked = msgpack.unpackb(dataset)
+
+
+class DistributedOperationNewsHandler(ZMQTopicHandlerBase):
+    """
+    Responsible to handle incoming news about operations running on the network.
+    """
+    def get_topic(self):
+        return constants.OPERATION_NEWS_TOPIC
+
+    def handle(self, manager, operation_info):
+        """
+        Handle the news
+        :param manager:
+        :param operation_info:
+        :return:
+        """
+        store = manager.get_operation_store()
+        operation_id = operation_info.pop('operation_id')
+        # Update the store but don't publish anything since we are not initiator
+        store.update(operation_id, publish=False, **operation_info)

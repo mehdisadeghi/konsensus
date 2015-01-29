@@ -9,7 +9,7 @@
 topics = {10010: 'hearbeat',
           10011: 'new message',
           10012: 'new dataset',
-          10013: 'new operation',
+          10013: 'operation news',
           10014: 'delegate',
           10015: 'delegate accepted',
           10016: 'pull request'}
@@ -23,9 +23,9 @@ NEW_MESSAGE_TOPIC = 10011
 # New dataset available
 NEW_DATASET_TOPIC = 10012
 
-# New operation submitted
-NEW_OPERATION_TOPIC = 10013
-NEW_OPERATION_SIG = 'operation.new'
+# Operation news
+OPERATION_NEWS_TOPIC = 10013
+#NEW_OPERATION_SIG = 'operation.new'
 
 # Delegate
 DELEGATE_TOPIC = 10014

@@ -25,15 +25,30 @@ class UseCaseOneTests(unittest.TestCase):
         self.api = zerorpc.Client()
         self.api.connect(self.control_uri)
 
-    def test_ds1(self):
-        logging.debug(self.api.use_case_1('ds1'))
+    # def test_ds1(self):
+    #     logging.debug(self.api.use_case_1('ds1'))
+    #
+    # # def tearDown(self):
+    # #     for pid in self.pids:
+    # #         os.kill(pid, 9)
+    #
+    # def runTest(self):
+    #     self.test_ds1()
 
-    # def tearDown(self):
-    #     for pid in self.pids:
-    #         os.kill(pid, 9)
-
-    def runTest(self):
-        self.test_ds1()
+#
+# class DiceTest(unittest.TestCase):
+#     def test_dice(self):
+#         from .decorators import OneTimeTrueDice as Dice
+#         d = Dice()
+#         while not d.throw():
+#             continue
+#         assert d.throw() == False
+#
+#         def throw_alot():
+#             assert d.throw() == False
+#
+#         #import timeit
+#         #print timeit.timeit(throw_alot)
 
 
 if __name__ == '__main__':

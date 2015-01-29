@@ -15,10 +15,10 @@ import msgpack
 #msgpack_numpy.patch()
 from blinker import signal
 
-import constants
-from api import KonsensusAPI
-from defaults import DefaultConfig
-from manager import KonsensusManager
+from . import constants
+from .api import KonsensusAPI
+from .settings import DefaultSettings
+from .manager import KonsensusManager
 
 # An application level variable to access internals such as manager
 app = None
@@ -27,7 +27,7 @@ app = None
 class KonsensusApp(object):
     def __init__(self, name, host="0.0.0.0", port=None, config=None):
         if not config:
-            config = DefaultConfig()
+            config = DefaultSettings()
         self.config = config
         config['HOST'] = host
         self.name = name
@@ -106,11 +106,18 @@ class KonsensusApp(object):
         s.bind(conn_string)
         s.run()
 
+    def get_api_endpoint(self):
+        """
+        Returns the api endpoint
+        :return:
+        """
+        return "tcp://%s:%s" % (self.host, self.config.PUB_PORT)
+
     def _run_publisher(self):
         context = zmq.Context()
         socket = context.socket(zmq.PUB)
         self.logger.info('Running publisher at tcp://*:%s' % self.config.PUB_PORT)
-        socket.bind("tcp://%s:%s" % (self.host, self.config.PUB_PORT))
+        socket.bind(self.get_api_endpoint())
 
         def publish_handler(sender, topic=None, **kwargs):
             if not topic:

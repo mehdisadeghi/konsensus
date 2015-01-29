@@ -6,14 +6,15 @@
 """
 import random
 import uuid
+import time
 import logging
 logger = logging.getLogger(__name__)
 
 import gevent
 import zmq.green as zmq
 
-import constants
-import helpers
+from . import constants
+from . import helpers
 
 
 class RandomDatasetStore(object):
@@ -27,7 +28,7 @@ class RandomDatasetStore(object):
         """
         self.peers = peers
 
-    def store(self, dataset, dataset_id=None, dataset_tags=None):
+    def store(self, dataset, dataset_tags=None):
         """
         Randomly store the given dataset on one of the network peers.
         :return:
@@ -42,12 +43,13 @@ class RandomDatasetStore(object):
         temp_port = socket.bind_to_random_port('tcp://127.0.0.1')
         logger.debug('Opened the pull port at %s' % temp_port)
 
-        if not dataset_id:
-            dataset_id = str(uuid.uuid4())
+        # Make an id for result dataset
+        dataset_id = str(uuid.uuid4())
 
+        # Inform others to come and get it
         helpers.publish(self,
                         constants.PULL_REQUEST_TOPIC,
-                        dataset_name=dataset_id,
+                        dataset_id=dataset_id,
                         target=(ip, api_port),
                         endpoint='tcp://127.0.0.1:%s' % temp_port)
 
@@ -78,8 +80,8 @@ class DistributedOperationStore(dict):
         logger.debug('Got a distributed operation store request %s %s' % (args, kwargs))
         operation_id = str(uuid.uuid4())
         self[operation_id] = kwargs
-
-        kwargs['state'] = 'init'
+        kwargs['submit_moment'] = time.time()
+        #kwargs['state'] = 'init'
         kwargs['args'] = args
 
         # Publish news about our operation, others will catch up with us
@@ -98,7 +100,8 @@ class DistributedOperationStore(dict):
         """
         # First check if we have this operation
 
-        logger.debug('Got a distributed operation store update request%s %s' % (operation_id, info))
+        logger.debug('Got an operation update request %s %s' %
+                     (operation_id, info))
         if operation_id not in self:
             self[operation_id] = info
         else:

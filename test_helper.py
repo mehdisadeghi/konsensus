@@ -6,12 +6,11 @@
 """
 import argparse
 import tempfile
-import logging
-#logging.basicConfig(level=logging.DEBUG)
-#logger = logging.getLogger(__name__)
 
-import defaults
-import application
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+from konsensus import settings, KonsensusApp
 
 
 def get_open_port():
@@ -26,7 +25,7 @@ def get_open_port():
 
 def make_config(id):
     """Makes a config with various port numbers and temp folder"""
-    config = defaults.DefaultConfig()
+    config = settings.DefaultSettings()
     api_port = get_open_port()
     pub_port = get_open_port()
     peer_id = id
@@ -51,7 +50,7 @@ def make_hdf5(path, dsname):
 
 
 def _cook_and_run(config=None):
-    app = application.KonsensusApp(config.PEER_ID, config=config)
+    app = KonsensusApp(config.PEER_ID, config=config)
     app.run()
 
 
@@ -61,7 +60,6 @@ def instance_factory(count):
     """Launch local application instance on random ports"""
     configs = []
     peers = []
-    #apps = []
 
     # Make an entry point node for sake of simplicity and ease of use
     entry_point_config = make_config(0)
@@ -79,22 +77,17 @@ def instance_factory(count):
         peers.append(('127.0.0.1', config.PUB_PORT, config.API_PORT))
         configs.append(config)
 
-    #procs = []
     from multiprocessing import Process
 
     pids = []
     for config in configs:
-        #logger.info('Going to cook an app #%s' % config.PEER_ID)
+        #print('Going to cook an app #%s' % config.PEER_ID)
         if config.HDF5_REPO:
             make_hdf5(config.HDF5_REPO, 'ds%s' % config.PEER_ID)
         config.PEERS = [p for p in peers if p != ('127.0.0.1', config.PUB_PORT, config.API_PORT)]
-        #app = application.KonsensusApp(config.PEER_ID, config=config)
-        #apps.append(app)
-        #p = Process(target=app.run)
         p = Process(target=_cook_and_run, kwargs={'config': config})
-        #procs.append(p)
         p.start()
-        #logger.info('App #%s started.' % config.PEER_ID)
+        #print('App #%s started.' % config.PEER_ID)
         config.update({'pid': p.pid})
         pids.append(p.pid)
 

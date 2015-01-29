@@ -4,15 +4,13 @@
 
     This file is part of konsensus project.
 """
-import socket
-
-import blinker
+import zerorpc
 import h5py
 import numpy as np
 
-import helpers
-import decorators
-from konsensus.store import RandomDatasetStore, DistributedOperationStore
+from . import helpers
+from . import decorators
+from .store import RandomDatasetStore, DistributedOperationStore
 
 
 class KonsensusManager(object):
@@ -60,24 +58,11 @@ class KonsensusManager(object):
         :return: np.array
         """
         f = h5py.File(self.config.HDF5_REPO, 'r')
-        #if dataset_id not in self.local_datasets:
+
         if dataset_id not in f:
             raise Exception('Dataset %s is not available in local repository' % dataset_id)
 
         return np.array(f.get(dataset_id))
-
-    # def run_operation(self, name, *args, **kwargs):
-    #     """
-    #     To run an op
-    #     :return:
-    #     """
-    #     if name in self.ops:
-    #         raise Exception('Operation is already submitted.')
-    #
-    #     self.logger.debug('Received a new operation request, signaling.')
-    #     sig = blinker.signal('operation.new')
-    #     sig.send(self, op_name=name)
-    #     self.ops[name] = name
 
     def get_dataset_map(self, *args, **kwargs):
         """
@@ -93,13 +78,13 @@ class KonsensusManager(object):
         """
         return self._operation_store
 
-    def has_dataset(self, dataset):
+    def has_dataset(self, dataset_id):
         """
         Check if we have the dataset available
         :param dataset:
         :return:
         """
-        return dataset in self.local_datasets
+        return dataset_id in self.local_datasets
 
     def has_command(self, command):
         """
@@ -114,49 +99,65 @@ class KonsensusManager(object):
         return self.config.PEERS
 
     @decorators.delegate
-    def use_case_1(self, dataset, result_ds_name, **kwargs):
+    def use_case_1(self, dataset_id, **kwargs):
         """
         Invokes operation for use case 1 described in the report
-        :param dataset:
+        :param dataset_id:
         :return:
         """
+        from .application import app
+        self.logger.debug('Request for use case 1 with dataset_id %s at host %s received' %
+                          (dataset_id, app.get_api_endpoint()))
 
-        hostname = socket.gethostname()
-        self.logger.debug('Request for use case 1 with dataset name %s at host %s received' % (dataset, hostname))
-
-        if dataset not in self.local_datasets:
-            raise Exception("We don't have this dataset: %s" % dataset)
+        if dataset_id not in self.local_datasets:
+            raise Exception("I don't have dataset %s" % dataset_id)
 
         f = h5py.File(self.config.HDF5_REPO, 'r')
-        result = np.array(f.get(dataset))
+        result = np.array(f.get(dataset_id))
         for i in xrange(len(result)):
             result[i] = np.mod(result[i], 2)
         f.close()
         # Save into the store
-        self._store.store(result, dataset_id=result_ds_name)
+        result_dataset_id = self._store.store(result)
 
-        return str(result)
+        # Update distributed operation store
+        self._operation_store.update(result_dataset_id=result_dataset_id, **kwargs)
 
-    def use_case_2(self, first_id, second_id, **kwargs):
+        # Don't return anything. The operation id will be returned by decorator.
+        # Everything is async here.
+        #return str(result)
+
+    @decorators.distribute_linear(use_case_1)
+    def use_case_2(self, dataset_ids, **kwargs):
         """
         A linear operation on first and second datasets.
         :param first_id: first dataset id
         :param second_id: second dataset id
         :returns:
         """
-        first_array = self.get_dataset(first_id)
-        second_array = self.get_dataset(second_id)
-        if first_array.size != second_array.size:
-            return Exception('Datasets should be of the same size')
-        result = []
-        for i in xrange(first_array.size):
-            result.append(first_array[i] + second_array[i])
+        arrays = []
+        for dataset_id in dataset_ids:
+            array = self.get_dataset(dataset_id)
+            if array.size != last_array.size:
+                return Exception('Datasets should be of the same size')
+            arrays.append(array)
+            last_array = array
+        # Use one arbitrary array to sum up the rest
+        result = list(arrays.pop())
+
+        for array in arrays:
+            for i in xrange(len(array)):
+                result[i] += array[i]
 
         npresult = np.array(result)
-        dataset_id = self._store.store(npresult)
+        # Save into the store
+        result_dataset_id = self._store.store(npresult)
 
-    @decorators.register
-    def dummy(self):
+        # Update distributed operation store
+        self._operation_store.update(result_dataset_id=result_dataset_id, **kwargs)
+
+    #@decorators.register
+    def dummy(self, *args, **kwargs):
         pass
 
     def store_array(self, array, name):
@@ -186,7 +187,6 @@ class KonsensusManager(object):
         :return:
         """
         #TODO: Use a proper command registration technique
-        import zerorpc
         if command in ('data', 'datasets'):
             datasets = {}
             for peer_ip, pub_port, api_port in self.config.PEERS:

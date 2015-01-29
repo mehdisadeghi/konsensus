@@ -11,7 +11,7 @@ import zmq.green as zmq
 import blinker
 import numpy
 
-import constants
+from . import constants
 
 logger = logging.getLogger(__name__)
 

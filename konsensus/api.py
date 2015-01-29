@@ -32,8 +32,8 @@ class KonsensusAPI(object):
     #     """
     #     return self._manager.run_operation(name, *args, **kwargs)
 
-    def dummy(self):
-        return self._manager.dummy()
+    def dummy(self, *args, **kwargs):
+        return self._manager.dummy(*args, **kwargs)
 
     # def get_operations(self):
     #     """
@@ -50,6 +50,15 @@ class KonsensusAPI(object):
         """
         return self._manager.use_case_1(dataset, *args, **kargs)
 
+
+    def use_case_2(self, *args, **kargs):
+        """
+        Invokes operation for use case 1 described in the report. Accepts 'peers', 'datasets' and 'operations as option.
+        :param dataset:
+        :return:
+        """
+        return self._manager.use_case_2(*args, **kargs)
+
     # @zerorpc.stream
     # def store(self, *args, **kwargs):
     #     """
@@ -63,10 +72,10 @@ class KonsensusAPI(object):
     # def pull_request(self, *args, **kwargs):
     #     return self._manager.pull_request(*args, **kwargs)
 
-    def list(self, command):
+    def list(self, command, **kwargs):
         """
         Return a list of datasets or peers
         :param command: "data" or "peers"
         :return:
         """
-        return self._manager.list(command)
+        return self._manager.list(command, **kwargs)

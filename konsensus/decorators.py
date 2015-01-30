@@ -129,7 +129,7 @@ def distribute_linear(target_function):
                                                mother_operation_id=mother_operation_id)
                 sub_operations.append(operation_id)
             store.update(mother_operation_id, sub_operations=sub_operations)
-            return operation_id
+            return mother_operation_id
         return new_func
 
     return distribute_linear_decorator

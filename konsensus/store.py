@@ -81,7 +81,9 @@ class DistributedOperationStore(dict):
         operation_id = str(uuid.uuid4())
         self[operation_id] = kwargs
         kwargs['submit_moment'] = time.time()
-        #kwargs['state'] = 'init'
+        state = constants.OperationState.init.value
+        logger.debug('Operation %s entering %s state' % (operation_id, state))
+        kwargs['state'] = state
         kwargs['args'] = args
 
         # Publish news about our operation, others will catch up with us
@@ -91,15 +93,18 @@ class DistributedOperationStore(dict):
                         **kwargs)
         return operation_id
 
-    def update(self, operation_id, publish=True, **info):
+    def update(self, operation_id=None, publish=True, **info):
         """
         Update the operation information and notify peers to update
         :param operation_id:
         :param info:
         :return:
         """
-        # First check if we have this operation
+        # If operation_id is not provided explicitly check if it is inside kwargs
+        if not operation_id and 'operation_id' not in info:
+            raise Exception("Operation id is not provided, can't update the store.")
 
+        # First check if we have this operation
         logger.debug('Got an operation update request %s %s' %
                      (operation_id, info))
         if operation_id not in self:

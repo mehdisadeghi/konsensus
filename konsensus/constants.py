@@ -4,6 +4,7 @@
 
     This file is part of konsensus project.
 """
+from enum import Enum
 
 # Human readable topics
 topics = {10010: 'hearbeat',
@@ -41,3 +42,11 @@ PUBLISH = 'publish'
 
 # Pull requests
 PULL_REQUEST_TOPIC = 10016
+
+
+# An enum to represent different operation states
+class OperationState(Enum):
+    init = 'init'
+    active = 'active'
+    done = 'done'
+    failed = 'failed'

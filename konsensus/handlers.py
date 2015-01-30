@@ -35,7 +35,7 @@ class DelegateTopicHandler(ZMQTopicHandlerBase):
         return constants.DELEGATE_TOPIC
 
     def handle(self, manager, delegate_info):
-        self.logger.debug('Got a delegate handle request')
+        self.logger.debug('Got a delegate handle request, checking data availability')
 
         # Check data availability
         if not manager.has_dataset(delegate_info['dataset_id']):
@@ -48,9 +48,9 @@ class DelegateTopicHandler(ZMQTopicHandlerBase):
         if not manager.has_command(delegate_info['command']):
             # Have the data but not the command
             self.logger.debug('Ignoring a request for %s on dataset %s. The command is not available' %
-                          (delegate_info['command'],
-                           delegate_info['dataset_id']))
-            return
+                              (delegate_info['command'],
+                               delegate_info['dataset_id']))
+            raise Exception('Unknown command %s ' % delegate_info['command'])
 
         # Adding host info to the delegate_info
         from .application import app
@@ -68,7 +68,7 @@ class DelegateTopicHandler(ZMQTopicHandlerBase):
         dataset_id = delegate_info.pop('dataset_id')
         #TODO: It should be done without this flag here
         delegate_info['is_delegate'] = True
-        result = func(dataset_id, **delegate_info)
+        func(dataset_id, **delegate_info)
 
 
 class DelegateAcceptedTopicHandler(ZMQTopicHandlerBase):
@@ -136,3 +136,19 @@ class DistributedOperationNewsHandler(ZMQTopicHandlerBase):
         operation_id = operation_info.pop('operation_id')
         # Update the store but don't publish anything since we are not initiator
         store.update(operation_id, publish=False, **operation_info)
+
+        #
+        # # Check if we are the collector
+        #
+        #
+        # # Check if we are responsible to collect data and this operation is a sub-operation
+        # # First find which operations have sub-operation
+        # operations_with_sub_ops = []
+        # for op in store:
+        #     # Check if this op has childs
+        #     if 'sub_operatinos' in op:
+        #         # Check if desired operation_id is amount this op's children
+        #         if operation_id in op['sub_operations']:
+        #             # We have found the parent of this operation
+        #             operations_with_sub_ops.append(op)
+

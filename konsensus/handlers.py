@@ -4,8 +4,6 @@
 
     This file is part of konsensus project.
 """
-import socket
-
 import zmq.green as zmq
 import blinker
 
@@ -137,9 +135,42 @@ class DistributedOperationNewsHandler(ZMQTopicHandlerBase):
         # Update the store but don't publish anything since we are not initiator
         store.update(operation_id, publish=False, **operation_info)
 
-        #
-        # # Check if we are the collector
-        #
-        #
+        # TODO: Move out the following code into some proper class
 
+        # First of all wait to make sure related following setup messages are arrived
+        import gevent
+        gevent.sleep(1)
 
+        # Check if we are the collector
+        if helpers.is_result_collector(operation_id):
+            self.logger.debug('I am collector, checking for sub-operations')
+            # Check if all the sub-ops are done
+            mother_op = helpers.get_mother_operation(operation_id)
+            print '*~#*~#*~#*~#*~#'
+            print mother_op
+            print '*~#*~#*~#*~#*~#'
+            # Collect result dataset ids
+            result_dataset_ids = []
+            for sub_op_id in mother_op['sub_operations']:
+                sub_op = store.get(sub_op_id)
+                if sub_op['state'] != constants.OperationState.done.value:
+                    # Some operations are not done, leave it.
+                    self.logger.debug('Some sub-operations are not done yet, we take no action.')
+                    return
+                if 'result_dataset_id' not in sub_op:
+                    raise Exception('Sub-operation %s is labled as done but it has no result dataset.' % sub_op_id)
+                result_dataset_ids.append(sub_op['result_dataset_id'])
+
+            # Sub-operations are done, so we run the command over dataset_ids
+            # Get command endpoint of the mother operation
+            func = getattr(manager, mother_op['command'])
+
+            self.logger.debug('Calling %s command with the global dataset ids' % mother_op['command'])
+            # Call command with an extra flag to bypass decorators
+            # The result will be stored by the function itself
+            print '*~#*~#*~#*~#*~#YOU SHOULD SEE THIS ONCE*~#*~#*~#*~#*~#*~#'
+            func(result_dataset_ids, bypass=True, operation_id=mother_op['operation_id'])
+
+            # Update the network about new state
+            store.update(operation_id=mother_op['operation_id'],
+                         state=constants.OperationState.done.value)

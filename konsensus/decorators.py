@@ -50,7 +50,7 @@ def delegate(func):
                     if mother:
                         # Assign ourselves as collector
                         store.update(operation_id=mother_oid,
-                                     collector=app.get_id())
+                                     collector_id=app.get_id())
                 func(self, dataset_id, *args, **kwargs)
                 state = constants.OperationState.done.value
                 self.logger.debug('Operation %s entering %s state' % (operation_id, state))
@@ -121,10 +121,26 @@ def distribute_linear(target_function):
     def distribute_linear_decorator(func):
         @functools.wraps(func)
         def new_func(self, *args, **kwargs):
+            # TODO: A better strategy not to involve these flags everywhere?
+            print '*~#*~#*~#*~#*~#*~#'
+            print kwargs
+            print '*~#*~#*~#*~#*~#*~#'
+            if kwargs.get('bypass'):
+                kwargs.pop('bypass')
+                print '*~#*~#*~#*~#*~#*~#'
+                print 'bypassing'
+                print '*~#*~#*~#*~#*~#*~#'
+                # Take no action
+                func(self, *args, **kwargs)
+                store = helpers.get_operation_store()
+                store.update(*args,
+                             state='finalizing',#constants.OperationState.done.value,
+                             **kwargs)
+                return kwargs.get('operation_id')
+
             dataset_ids = args
             # Store current operation
-            from application import app
-            store = app.manager.get_operation_store()
+            store = store = helpers.get_operation_store()
             mother_operation_id = store.store(dataset_ids,
                                               command=func.__name__,
                                               **kwargs)
@@ -134,7 +150,7 @@ def distribute_linear(target_function):
             # We might also be the collector in case we have one of these datasets
             import random
             choice = random.choice(dataset_ids)
-
+            from .application import app
             # For each dataset launch a separate operation and keep it's operation_id
             for dataset_id in dataset_ids:
                 operation_id = target_function(app.manager,

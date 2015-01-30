@@ -11,8 +11,8 @@ import zmq.green as zmq
 import zerorpc
 # Monkey patching msgpack to support numpy arrays
 import msgpack
-#import msgpack_numpy
-#msgpack_numpy.patch()
+import msgpack_numpy as mn
+mn.patch()
 from blinker import signal
 
 from . import constants
@@ -111,7 +111,7 @@ class KonsensusApp(object):
         Returns the api endpoint
         :return:
         """
-        return "tcp://%s:%s" % (self.host, self.config.PUB_PORT)
+        return "tcp://%s:%s" % (self.host, self.port)
 
     def get_id(self):
         """
@@ -124,7 +124,7 @@ class KonsensusApp(object):
         context = zmq.Context()
         socket = context.socket(zmq.PUB)
         self.logger.info('Running publisher at tcp://*:%s' % self.config.PUB_PORT)
-        socket.bind(self.get_api_endpoint())
+        socket.bind("tcp://%s:%s" % (self.host, self.config.PUB_PORT))
 
         def publish_handler(sender, topic=None, **kwargs):
             if not topic:

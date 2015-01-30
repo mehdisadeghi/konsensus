@@ -44,8 +44,8 @@ def make_config(id):
 def make_hdf5(path, dsname):
     import h5py, numpy as np
     f = h5py.File(path, 'w')
-    ds = f.create_dataset(dsname, (1000000,), dtype='i')
-    ds[...] = np.random.random_integers(1, high=100, size=1000000)
+    ds = f.create_dataset(dsname, (1000,), dtype='i')
+    ds[...] = np.random.random_integers(1, high=100, size=1000)
     f.close()
 
 

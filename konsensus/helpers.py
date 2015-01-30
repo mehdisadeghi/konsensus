@@ -64,20 +64,49 @@ def whoami(config):
     logger.debug('I am konsensus instance at %s:%s' % (config.HOST, config.API_PORT))
 
 
-def get_mother_operation(operation_id):
+def get_operation_store():
     """
-    Check if the given operation_id is a sub-operation and then return it's parent
-    :param operation_id:
+    A shortcut method to return operation store
     :return:
     """
     from .application import app
-    store = app.manager.get_operation_store()
-    # First find which operations have sub-operation
-    for op in store:
-        # Check if this op has sub ops
-        if 'sub_operatinos' in op:
-            # Check if desired operation_id is amount this op's children
-            if operation_id in op['sub_operations']:
-                return op
+    return app.manager.get_operation_store()
 
-    # Return None if there is no parents for this operation_id
+
+def is_result_collector(operation_id):
+    """
+    Check if we are the result collector for the given operation
+    :return:
+    """
+    from .application import app
+    # Check if this operation is sub-op
+    mother = get_mother_operation(operation_id)
+    if mother:
+        # Check if the assigned collector id is same as our id
+        return mother.get('collector_id') == app.get_id()
+    else:
+        return False
+
+
+def get_mother_operation(operation_id):
+    """
+    Check if the given operation_id is a sub-operation and return its mother with key included
+    :param operation_id:
+    :return:
+    """
+    store = get_operation_store()
+    operation = store.get(operation_id)
+    mother_id = operation.get('mother_operation_id')
+    if mother_id:
+        mother = store.get(mother_id)
+        mother['operation_id'] = mother_id
+        return mother
+
+
+def is_sub_operation(operation_id):
+    """
+    Check if the given operation_id is a sub-operation
+    :param operation_id:
+    :return:
+    """
+    return get_mother_operation() is not None

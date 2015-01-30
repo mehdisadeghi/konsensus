@@ -51,18 +51,51 @@ class KonsensusManager(object):
         """
         return self._operation_store
 
-    def get_dataset(self, dataset_id, *args, **kwargs):
+    def get_remote_dataset(self, endpoint, dataset_id):
+        """
+        Fetch a dataset from a remote peer
+        :return:
+        """
+        c = zerorpc.Client()
+        c.connect(endpoint)
+        dataset = c.get_dataset(dataset_id)
+        return dataset
+
+
+    def get_dataset(self, dataset_id):
         """
         Get a specifc dataset
         :param dataset_id: dataset id
         :return: np.array
         """
+        if not self.has_dataset(dataset_id):
+            # Fetch remote dataset
+            # TODO: We can maintain distributed dataset table same as operation and peers
+            global_dataset = self.get_global_dataset_map()
+            for peer_api_endpoint, map in global_dataset.iteritems():
+                if dataset_id in map:
+                    return self.get_remote_dataset(peer_api_endpoint, dataset_id)
+            raise Exception('Dataset %s neither is available locally nor on the network' % dataset_id)
+
         f = h5py.File(self.config.HDF5_REPO, 'r')
-
-        if dataset_id not in f:
-            raise Exception('Dataset %s is not available in local repository' % dataset_id)
-
         return np.array(f.get(dataset_id))
+
+    def get_global_dataset_map(self):
+        """
+        Return a list of all datasets present on the network
+        :return:
+        """
+        datasets = {}
+        for peer_ip, pub_port, api_port in self.config.PEERS:
+            key = 'tcp://%s:%s' % (peer_ip, api_port)
+            c = zerorpc.Client()
+            c.connect('tcp://%s:%s' % (peer_ip, api_port))
+            datasets[key] = c.get_dataset_map()
+
+        # Add local ones as well
+        from .application import app
+        datasets[app.get_id()] = self.get_dataset_map()
+        return datasets
 
     def get_dataset_map(self, *args, **kwargs):
         """
@@ -188,14 +221,7 @@ class KonsensusManager(object):
         """
         #TODO: Use a proper command registration technique
         if command in ('data', 'datasets'):
-            datasets = {}
-            for peer_ip, pub_port, api_port in self.config.PEERS:
-                key = '%s:%s' % (peer_ip, api_port)
-                datasets[key] = []
-                c = zerorpc.Client()
-                c.connect('tcp://%s:%s' % (peer_ip, api_port))
-                datasets[key].append(c.get_dataset_map())
-            return datasets
+            return self.get_global_dataset_map()
 
         elif command == 'peers':
             return self.config.PEERS

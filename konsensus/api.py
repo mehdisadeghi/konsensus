@@ -50,7 +50,6 @@ class KonsensusAPI(object):
         """
         return self._manager.use_case_1(dataset, *args, **kargs)
 
-
     def use_case_2(self, *args, **kargs):
         """
         Invokes operation for use case 1 described in the report. Accepts 'peers', 'datasets' and 'operations as option.
@@ -59,18 +58,18 @@ class KonsensusAPI(object):
         """
         return self._manager.use_case_2(*args, **kargs)
 
-    # @zerorpc.stream
-    # def store(self, *args, **kwargs):
-    #     """
-    #     Store the given dataset in the hdf5 repo
-    #     :param dataset:
-    #     :param name:
-    #     :return:
-    #     """
-    #     return self._manager.store(*args, **kwargs)
+    #@zerorpc.stream
+    def get_dataset(self, dataset):
+        """
+        Stream a dataset back
+        :param dataset:
+        :param name:
+        :return:
+        """
+        return self._manager.get_dataset(dataset)
 
-    # def pull_request(self, *args, **kwargs):
-    #     return self._manager.pull_request(*args, **kwargs)
+    def pull_request(self, *args, **kwargs):
+        return self._manager.pull_request(*args, **kwargs)
 
     def list(self, command, **kwargs):
         """

@@ -14,24 +14,21 @@ from . import constants
 def delegate(func):
     @functools.wraps(func)
     def new_func(self, dataset_id, *args, **kwargs):
-        # If the function has already been delegated don't circulate it again.
-        # if 'is_delegate' in kwargs:
-        #     self.logger.debug('Ignoring delegation try for already delegated request')
-        #     # We don't need this flag anymore, otherwise it will be stored in the store.
-        #     is_delegate = kwargs.pop('is_delegate')
-        #     return func(self, dataset_id, *args, **kwargs)
-
         # Store the operation if its new, otherwise take no action
         if 'operation_id' not in kwargs:
             from application import app
             store = app.manager.get_operation_store()
             kwargs.update(operation_id=store.store(dataset_id,
                                                    *args,
-                                                   func_name=func.__name__,
+                                                   command=func.__name__,
                                                    **kwargs))
 
         # Ask others to continue if we don't have the required data
         if dataset_id in self.local_datasets:
+            # TODO: Remove this `is_delegate` stuff all together. Separate service from internals.
+            # prevent `is_delegate` from propagating into store
+            if 'is_delegate' in kwargs:
+                kwargs.pop('is_delegate')
             # We have the data so we do the business
             return func(self, dataset_id, *args, **kwargs)
         # Delegate in case that this is not a delegate itself
@@ -51,10 +48,6 @@ def delegate(func):
 
             # Return the operation id not to break the wrapped function return value
             return operation_id
-        elif 'is_delegate' in kwargs:
-            self.logger.debug('Ignoring delegation try for already delegated request')
-            # We don't need this flag anymore, otherwise it will be stored in the store.
-            kwargs.pop('is_delegate')
 
     return new_func
 
@@ -81,23 +74,6 @@ def delegate(func):
 #     return new_func
 
 
-# class OneTimeTrueDice(object):
-#     """
-#     This is a dice which will become True ONLY once
-#     """
-#     def __init__(self):
-#         self._done = False
-#
-#     def throw(self):
-#         import random
-#         if not self._done:
-#             choice = random.choice([True, False])
-#             if choice:
-#                 self._done = True
-#             return choice
-#         return False
-
-
 def distribute_linear(target_function):
     """
     Breaks a linear operation into sub-operations and launches them in a collective manner.
@@ -112,7 +88,7 @@ def distribute_linear(target_function):
             from application import app
             store = app.manager.get_operation_store()
             mother_operation_id = store.store(dataset_ids,
-                                              func_name=func.__name__,
+                                              command=func.__name__,
                                               **kwargs)
             sub_operations = []
 

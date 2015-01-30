@@ -35,21 +35,6 @@ class UseCaseOneTests(unittest.TestCase):
     # def runTest(self):
     #     self.test_ds1()
 
-#
-# class DiceTest(unittest.TestCase):
-#     def test_dice(self):
-#         from .decorators import OneTimeTrueDice as Dice
-#         d = Dice()
-#         while not d.throw():
-#             continue
-#         assert d.throw() == False
-#
-#         def throw_alot():
-#             assert d.throw() == False
-#
-#         #import timeit
-#         #print timeit.timeit(throw_alot)
-
 
 if __name__ == '__main__':
     unittest.main()

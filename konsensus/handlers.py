@@ -141,14 +141,5 @@ class DistributedOperationNewsHandler(ZMQTopicHandlerBase):
         # # Check if we are the collector
         #
         #
-        # # Check if we are responsible to collect data and this operation is a sub-operation
-        # # First find which operations have sub-operation
-        # operations_with_sub_ops = []
-        # for op in store:
-        #     # Check if this op has childs
-        #     if 'sub_operatinos' in op:
-        #         # Check if desired operation_id is amount this op's children
-        #         if operation_id in op['sub_operations']:
-        #             # We have found the parent of this operation
-        #             operations_with_sub_ops.append(op)
+
 

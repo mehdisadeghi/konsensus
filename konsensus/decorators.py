@@ -4,7 +4,6 @@
 
     This file is part of konsensus project.
 """
-import uuid
 import functools
 
 from . import helpers
@@ -16,7 +15,9 @@ def delegate(func):
     def new_func(self, dataset_id, *args, **kwargs):
         self.logger.debug('Entered delegate decorator function')
         # Extract operation_id
-        operation_id = kwargs.get('operation_id', None)
+        operation_id = kwargs.get('operation_id')
+        # Extract collector flag
+        is_collector = kwargs.pop('is_collector', False)
         # Get store
         from application import app
         store = app.manager.get_operation_store()
@@ -27,6 +28,7 @@ def delegate(func):
                                        *args,
                                        command=func.__name__,
                                        **kwargs)
+            kwargs['operation_id'] = operation_id
 
         # Ask others to continue if we don't have the required data
         if dataset_id in self.local_datasets:
@@ -39,29 +41,29 @@ def delegate(func):
             # Furthermore we don't care about the result, its async, remember?
             try:
                 self.logger.debug('Running real function inside delegate decorator')
+                # If is_collector is set, we update
+                if is_collector:
+                    # Check if this is a sub-operation
+                    self.logger.debug('Going to update mother %s' % kwargs['mother_operation_id'])
+                    mother_oid = kwargs['mother_operation_id']
+                    mother = store.get(mother_oid)
+                    if mother:
+                        # Assign ourselves as collector
+                        store.update(operation_id=mother_oid,
+                                     collector=app.get_id())
                 func(self, dataset_id, *args, **kwargs)
                 state = constants.OperationState.done.value
                 self.logger.debug('Operation %s entering %s state' % (operation_id, state))
+                # Store will also update everybody
                 store.update(operation_id=operation_id,
                              state=state)
-                # Not required, store will tell everybody
-                # # Now inform others about operation state of finished
-                # helpers.publish(self,
-                #                 constants.OPERATION_NEWS_TOPIC,
-                #                 operation_id=operation_id,
-                #                 state=constants.OperationState.done.value)
             # TODO: Define proper exceptions
             except Exception, e:
                 state = constants.OperationState.failed.value
                 self.logger.debug('Operation %s entering %s state' % (operation_id, state))
+                # Store will also update everybody
                 store.update(operation_id=operation_id,
                              state=state)
-                # Not required, store will tell everybody
-                # # Tell others it failed
-                # helpers.publish(self,
-                #                 constants.OPERATION_NEWS_TOPIC,
-                #                 operation_id=operation_id,
-                #                 state=constants.OperationState.failed.value)
                 # Don't pass silently
                 raise
 
@@ -76,7 +78,8 @@ def delegate(func):
                             constants.DELEGATE_TOPIC,
                             command=func.__name__,
                             dataset_id=dataset_id,
-                            operation_id=operation_id)
+                            is_collector=is_collector,
+                            **kwargs)
             self.logger.debug('Request for dataset %s published' % dataset_id)
 
             # Return the operation id not to break the wrapped function return value
@@ -139,7 +142,9 @@ def distribute_linear(target_function):
                                                is_collector=(choice == dataset_id),
                                                mother_operation_id=mother_operation_id)
                 sub_operations.append(operation_id)
-            store.update(mother_operation_id, sub_operations=sub_operations)
+            store.update(mother_operation_id,
+                         sub_operations=sub_operations,
+                         state=constants.OperationState.active.value)
             return mother_operation_id
         return new_func
 

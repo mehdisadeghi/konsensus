@@ -113,6 +113,13 @@ class KonsensusApp(object):
         """
         return "tcp://%s:%s" % (self.host, self.config.PUB_PORT)
 
+    def get_id(self):
+        """
+        Returns applications unique id to be identified in the network
+        :return:
+        """
+        return self.get_api_endpoint()
+
     def _run_publisher(self):
         context = zmq.Context()
         socket = context.socket(zmq.PUB)

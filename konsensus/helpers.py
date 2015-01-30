@@ -62,3 +62,22 @@ def recv_array(socket, flags=0, copy=True, track=False):
 
 def whoami(config):
     logger.debug('I am konsensus instance at %s:%s' % (config.HOST, config.API_PORT))
+
+
+def get_mother_operation(operation_id):
+    """
+    Check if the given operation_id is a sub-operation and then return it's parent
+    :param operation_id:
+    :return:
+    """
+    from .application import app
+    store = app.manager.get_operation_store()
+    # First find which operations have sub-operation
+    for op in store:
+        # Check if this op has sub ops
+        if 'sub_operatinos' in op:
+            # Check if desired operation_id is amount this op's children
+            if operation_id in op['sub_operations']:
+                return op
+
+    # Return None if there is no parents for this operation_id

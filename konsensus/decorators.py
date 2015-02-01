@@ -13,7 +13,7 @@ from . import constants
 def delegate(func):
     @functools.wraps(func)
     def new_func(self, dataset_id, *args, **kwargs):
-        self.logger.debug('Entered delegate decorator function')
+        # self.logger.debug('Entered delegate decorator function')
         # Extract operation_id
         operation_id = kwargs.get('operation_id')
         # Extract collector flag
@@ -23,7 +23,7 @@ def delegate(func):
         store = app.manager.get_operation_store()
         # Store if this is new operation, otherwise take no action
         if not operation_id:
-            self.logger.debug('Creating new operation id in delegate decorator')
+            # self.logger.debug('Creating new operation id in delegate decorator')
             operation_id = store.store(dataset_id,
                                        *args,
                                        command=func.__name__,
@@ -32,7 +32,7 @@ def delegate(func):
 
         # Ask others to continue if we don't have the required data
         if dataset_id in self.local_datasets:
-            self.logger.debug('We have dataset locally in delegate decorator')
+            # self.logger.debug('We have dataset locally in delegate decorator')
             # TODO: Remove this `is_delegate` stuff all together. Separate service from internals.
             # prevent `is_delegate` from propagating into store
             if 'is_delegate' in kwargs:
@@ -40,11 +40,11 @@ def delegate(func):
             # We have the data so we do the business
             # Furthermore we don't care about the result, its async, remember?
             try:
-                self.logger.debug('Running real function inside delegate decorator')
+                # self.logger.debug('Running real function inside delegate decorator')
                 # If is_collector is set, we update
                 if is_collector:
                     # Check if this is a sub-operation
-                    self.logger.debug('Going to update mother %s' % kwargs['mother_operation_id'])
+                    # self.logger.debug('Going to update mother %s' % kwargs['mother_operation_id'])
                     mother_oid = kwargs['mother_operation_id']
                     mother = store.get(mother_oid)
                     if mother:
@@ -53,14 +53,14 @@ def delegate(func):
                                      collector_id=app.get_id())
                 func(self, dataset_id, *args, **kwargs)
                 state = constants.OperationState.done.value
-                self.logger.debug('Operation %s entering %s state' % (operation_id, state))
+                # self.logger.debug('Operation %s entering %s state' % (operation_id, state))
                 # Store will also update everybody
                 store.update(operation_id=operation_id,
                              state=state)
             # TODO: Define proper exceptions
             except Exception, e:
                 state = constants.OperationState.failed.value
-                self.logger.debug('Operation %s entering %s state' % (operation_id, state))
+                # self.logger.debug('Operation %s entering %s state' % (operation_id, state))
                 # Store will also update everybody
                 store.update(operation_id=operation_id,
                              state=state)
@@ -80,7 +80,7 @@ def delegate(func):
                             dataset_id=dataset_id,
                             is_collector=is_collector,
                             **kwargs)
-            self.logger.debug('Request for dataset %s published' % dataset_id)
+            # self.logger.debug('Request for dataset %s published' % dataset_id)
 
             # Return the operation id not to break the wrapped function return value
             return operation_id
@@ -88,28 +88,6 @@ def delegate(func):
             self.logger.debug('Passing silently in delegate decorator because this is a delegate or we do not have data')
 
     return new_func
-
-
-# def register(func):
-#     """
-#     Makes a new operation id and stores it in distributed operation store.
-#     :param func:
-#     :return:
-#     """
-#     # Get application instance to access manager
-#
-#     @functools.wraps(func)
-#     def new_func(self, *args, **kwargs):
-#         from application import app
-#         store = app.manager.get_operation_store()
-#         operation_id = store.store(*args,
-#                                    func_name=func.__name__,
-#                                    **kwargs)
-#         kwargs.update(operation_id=operation_id)
-#         func(self, *args, **kwargs)
-#         return operation_id
-#
-#     return new_func
 
 
 def distribute_linear(target_function):
@@ -122,27 +100,26 @@ def distribute_linear(target_function):
         @functools.wraps(func)
         def new_func(self, *args, **kwargs):
             # TODO: A better strategy not to involve these flags everywhere?
-            print '*~#*~#*~#*~#*~#*~#'
-            print kwargs
-            print '*~#*~#*~#*~#*~#*~#'
             if kwargs.get('bypass'):
                 kwargs.pop('bypass')
-                print '*~#*~#*~#*~#*~#*~#'
-                print 'bypassing'
-                print '*~#*~#*~#*~#*~#*~#'
+                # print '*~#*~#*~#*~#*~#*~#'
+                # print 'bypassing'
+                # print '*~#*~#*~#*~#*~#*~#'
                 # Take no action
                 func(self, *args, **kwargs)
-                store = helpers.get_operation_store()
-                store.update(*args,
-                             state='finalizing',#constants.OperationState.done.value,
-                             **kwargs)
+                # store = helpers.get_operation_store()
+                # operation_id = kwargs.get('operation_id')
+                # store.update(state='finalizing',#constants.OperationState.done.value,
+                #              operation_id=operation_id)
                 return kwargs.get('operation_id')
 
             dataset_ids = args
             # Store current operation
-            store = store = helpers.get_operation_store()
+            store = helpers.get_operation_store()
             mother_operation_id = store.store(dataset_ids,
                                               command=func.__name__,
+                                              sub_op_count=len(dataset_ids),
+                                              sub_operations=[],
                                               **kwargs)
             sub_operations = []
 
@@ -156,6 +133,7 @@ def distribute_linear(target_function):
                 operation_id = target_function(app.manager,
                                                dataset_id,
                                                is_collector=(choice == dataset_id),
+                                               sub_operations=[],
                                                mother_operation_id=mother_operation_id)
                 sub_operations.append(operation_id)
             store.update(mother_operation_id,

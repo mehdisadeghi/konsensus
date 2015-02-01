@@ -22,7 +22,7 @@ from .manager import KonsensusManager
 
 # An application level variable to access internals such as manager
 app = None
-
+temp_repo = {}
 
 class KonsensusApp(object):
     def __init__(self, name, host="0.0.0.0", port=None, config=None):
@@ -35,7 +35,17 @@ class KonsensusApp(object):
         self.port = port or config.API_PORT
         self._topic_handlers = {}
         self.manager = KonsensusManager(self.config)
-        self.logger = logging.getLogger(__name__)
+
+        # Configure main logger
+        self.logger = logging.getLogger('konsensus')
+        self.logger.propagate = False
+        ch = logging.StreamHandler()
+        fmt = '%(levelname)s:%(name)s:l%(lineno)s:p' + str(config.API_PORT) + '\t %(message)s'
+        formatter = logging.Formatter(fmt)
+        ch.setFormatter(formatter)
+        self.logger.addHandler(ch)
+        self.logger.setLevel(config.LOG_LEVEL)
+
         global app
         app = self
 
@@ -99,7 +109,7 @@ class KonsensusApp(object):
     def _run_api_listener(self):
         conn_string = "tcp://{host}:{port}".format(host=self.host,
                                                    port=self.port)
-        self.logger.info("Starting the server on %s" % conn_string)
+        self.logger.info("Starting API at %s" % conn_string)
         self._register_handlers()
         self.api = KonsensusAPI(self.manager)
         s = zerorpc.Server(self.api)
@@ -123,14 +133,14 @@ class KonsensusApp(object):
     def _run_publisher(self):
         context = zmq.Context()
         socket = context.socket(zmq.PUB)
-        self.logger.info('Running publisher at tcp://*:%s' % self.config.PUB_PORT)
+        self.logger.info('Starting publisher at tcp://*:%s' % self.config.PUB_PORT)
         socket.bind("tcp://%s:%s" % (self.host, self.config.PUB_PORT))
 
         def publish_handler(sender, topic=None, **kwargs):
             if not topic:
                 raise Exception("No topic given. Won't publish anything without it.")
-            self.logger.debug('Got a publish request for topic %s:%s' %
-                              (topic, constants.topics.get(topic)))
+            #self.logger.debug('Got a publish request for topic %s:%s' %
+            #                  (topic, constants.topics.get(topic)))
 
             packed = msgpack.packb(kwargs)
             socket.send('%s %s' % (topic, packed))
@@ -164,8 +174,8 @@ class KonsensusApp(object):
             topic, delimiter, packed = msg.partition(' ')
             topic = int(topic)
             message_dict = msgpack.unpackb(packed)
-            self.logger.debug('News for topic %s:%s arrived' %
-                              (topic, constants.topics.get(topic)))
+            #self.logger.debug('News for topic %s:%s arrived' %
+            #                  (topic, constants.topics.get(topic)))
             self._handle_topic(topic, message_dict)
 
         sig = signal(constants.NEW_MESSAGE_TOPIC)

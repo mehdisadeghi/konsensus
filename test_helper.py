@@ -36,7 +36,8 @@ def make_config(id):
         'PUB_PORT': pub_port,  # Will publish all the news on this port.
         'PEERS': [],  # ('127.0.0.1', 9201) Name of peers to subscribe to their publisher port.
         'HDF5_REPO': loc,
-        'LOG_LEVEL': 'DEBUG'
+        'LOG_LEVEL': 'DEBUG',
+        'LOG_FILE': tempfile.mktemp(suffix='.log')
         })
     return config
 
@@ -64,6 +65,7 @@ def instance_factory(count):
     # Make an entry point node for sake of simplicity and ease of use
     entry_point_config = make_config(0)
     entry_point_config.update({
+        #'LOG_LEVEL': 'ERROR',
         'PEER_ID': 0,
         'API_PORT': 9998,  # API port. Application will listen for incoming requests
         'PUB_PORT': 9999,  # Will publish all the news on this port.

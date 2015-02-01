@@ -139,8 +139,8 @@ class KonsensusManager(object):
         :return:
         """
         from .application import app
-        self.logger.debug('Request for use case 1 with dataset_id %s at host %s received' %
-                          (dataset_id, app.get_api_endpoint()))
+        # self.logger.debug('Request for use case 1 with dataset_id %s at host %s received' %
+        #                   (dataset_id, app.get_api_endpoint()))
 
         if dataset_id not in self.local_datasets:
             raise Exception("I don't have dataset %s" % dataset_id)
@@ -168,13 +168,14 @@ class KonsensusManager(object):
         :param second_id: second dataset id
         :returns:
         """
+        assert len(dataset_ids) == 2
         arrays = []
         for dataset_id in dataset_ids:
             array = self.get_dataset(dataset_id)
-            if array.size != last_array.size:
-                return Exception('Datasets should be of the same size')
+            #if array.size != last_array.size:
+            #    return Exception('Datasets should be of the same size')
             arrays.append(array)
-            last_array = array
+            #last_array = array
         # Use one arbitrary array to sum up the rest
         result = list(arrays.pop())
 
@@ -200,7 +201,6 @@ class KonsensusManager(object):
         :param name:
         :return:
         """
-        helpers.whoami(self.config)
         self.logger.debug('Opening hdf5 repo %s' % self.config.HDF5_REPO)
         f = h5py.File(self.config.HDF5_REPO, 'r+')
         ds = None

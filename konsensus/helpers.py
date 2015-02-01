@@ -79,13 +79,21 @@ def is_result_collector(operation_id):
     :return:
     """
     from .application import app
+    store = get_operation_store()
     # Check if this operation is sub-op
     mother = get_mother_operation(operation_id)
     if mother:
         # Check if the assigned collector id is same as our id
         return mother.get('collector_id') == app.get_id()
+    # Now check if this operation is itself a mother operation and if the given
+    # operation id belongs to it
+    # TODO: Turn operation into a class
     else:
-        return False
+        operation = store.get(operation_id)
+        if operation.get('collector_id') == app.get_id():
+            return True
+    # If none of above is correct then its not collector
+    return False
 
 
 def get_mother_operation(operation_id):

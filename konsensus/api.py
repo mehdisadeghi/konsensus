@@ -78,3 +78,7 @@ class KonsensusAPI(object):
         :return:
         """
         return self._manager.list(command, **kwargs)
+
+    def get_temp_dataset(self, dataset_id):
+        from .application import temp_repo
+        return temp_repo.pop(dataset_id)

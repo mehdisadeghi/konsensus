@@ -49,18 +49,17 @@ def _cook_and_run(config=None):
     app.run()
 
 
-def make_hdf5(path, dsname):
+def make_hdf5(path, dataset_id):
     import h5py, numpy as np
     f = h5py.File(path, 'w')
-    ds = f.create_dataset(dsname, (1000,), dtype='i')
+    ds = f.create_dataset(dataset_id, (1000,), dtype='i')
     ds[...] = np.random.random_integers(1, high=100, size=1000)
     f.close()
 
 
 def instance_factory(count):
     """Launch local application instance on random ports"""
-    configs = []
-    peers = []
+    configs = random_config_factory(count - 1)
     pids = []
 
     if count > 0:
@@ -70,20 +69,46 @@ def instance_factory(count):
             'DS_ID': 'ds0',
             'PEERS': []
         })
-        configs.append(entry_point_config)
-        peers.append(('127.0.0.1', entry_point_config['PUB_PORT'], entry_point_config['API_PORT']))
-        count -= 1
-        for c in xrange(count):
-            config = make_config('ds%s' % (c + 1))
-            peers.append(('127.0.0.1', config['PUB_PORT'], config['API_PORT']))
-            configs.append(config)
-
         for config in configs:
-            make_hdf5(config['HDF5_REPO'], config['DS_ID'])
-            config['PEERS'] = [p for p in peers if p != ('127.0.0.1', config['PUB_PORT'], config['API_PORT'])]
+            config['PEERS'].append(('127.0.0.1', entry_point_config['PUB_PORT'], entry_point_config['API_PORT']))
+            entry_point_config['PEERS'].append(('127.0.0.1', config['PUB_PORT'], config['API_PORT']))
+
+        configs.append(entry_point_config)
+        for config in configs:
             p = Process(target=_cook_and_run, kwargs={'config': config})
             p.start()
             config.update({'pid': p.pid})
             pids.append(p.pid)
 
-        return pids, configs
+        return pids, entry_point_config, configs
+
+
+def random_instance_factory(count, log_level='DEBUG'):
+    configs = random_config_factory(count, log_level=log_level)
+    pids = []
+
+    for config in configs:
+        p = Process(target=_cook_and_run, kwargs={'config': config})
+        p.start()
+        config.update({'pid': p.pid})
+        pids.append(p.pid)
+
+    return pids, configs
+
+
+def random_config_factory(count, log_level='DEBUG'):
+    """Launch local application instance on random ports"""
+    configs = []
+    peers = []
+
+    for c in xrange(count):
+        config = make_config('ds%s' % (c + 1))
+        config['LOG_LEVEL'] = log_level
+        make_hdf5(config['HDF5_REPO'], config['DS_ID'])
+        peers.append(('127.0.0.1', config['PUB_PORT'], config['API_PORT']))
+        configs.append(config)
+
+    for config in configs:
+        config['PEERS'] = [p for p in peers if p != ('127.0.0.1', config['PUB_PORT'], config['API_PORT'])]
+
+    return configs

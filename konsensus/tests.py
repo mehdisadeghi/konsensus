@@ -9,7 +9,7 @@ import unittest
 
 import zerorpc
 
-from .test_helper import instance_factory
+from .test_helper import random_instance_factory
 
 
 api = None
@@ -18,14 +18,11 @@ pids = None
 
 
 def setUpModule():
-    global pids, entry_point_config, configs
-    # server_config = make_config()
-    # server = multiprocessing.Process(target=_cook_and_run, kwargs={'config': server_config})
-    # server.start()
-    pids, entry_point_config, configs = instance_factory(1)
+    global pids, configs
+    pids, configs = random_instance_factory(1)
 
     global api, api_endpoint
-    api_endpoint = 'tcp://0.0.0.0:%s' % entry_point_config['API_PORT']
+    api_endpoint = 'tcp://0.0.0.0:%s' % configs[0]['API_PORT']
     api = zerorpc.Client()
     api.connect(api_endpoint)
 
@@ -50,7 +47,7 @@ class BasicAPITests(unittest.TestCase):
         assert api.list('operations') == {}
 
     def test_initial_datasets(self):
-        assert api.list('datasets') == {api_endpoint: {}}
+        assert api.list('datasets') == {api_endpoint: {'ds1': {'array size': 1000}}}
 
-    def test_use_case_1(self):
-        assert api.get_dataset_map() == {}
+    def test_get_dataset_map(self):
+        assert api.get_dataset_map() == {'ds1': {'array size': 1000}}

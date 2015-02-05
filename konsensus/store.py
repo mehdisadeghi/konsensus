@@ -122,8 +122,9 @@ class DistributedOperationStore(dict):
             self[operation_id].update(info)
 
         # Calculate duration
-        if self[operation_id]['state'] == constants.OperationState.done.value:
-            info['duration'] = time.time() - self[operation_id]['submit_moment']
+        if 'state' in self[operation_id] and 'submit_moment' in self[operation_id]:
+            if self[operation_id]['state'] == constants.OperationState.done.value:
+                self[operation_id]['duration'] = time.time() - self[operation_id]['submit_moment']
 
         # If we are the initiator peer we will publish this otherwise not.
         if publish:

@@ -130,6 +130,8 @@ class KonsensusManager(object):
         """Returns the peers"""
         return self.config['PEERS']
 
+    def get_operation(self, operation_id):
+        return self.get_operation_store().get(operation_id)
     @decorators.delegate
     def use_case_1(self, dataset_id, **kwargs):
         """

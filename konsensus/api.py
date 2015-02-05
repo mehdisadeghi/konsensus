@@ -51,6 +51,9 @@ class KonsensusAPI(object):
         """
         return self._manager.get_dataset(dataset)
 
+    def get_operation(self, operation_id):
+        return self._manager.get_operation(operation_id)
+
     def pull_request(self, *args, **kwargs):
         return self._manager.pull_request(*args, **kwargs)
 

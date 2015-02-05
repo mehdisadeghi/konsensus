@@ -51,7 +51,7 @@ def make_hdf5(path, dsname):
 
 
 def _cook_and_run(config=None):
-    app = KonsensusApp(config.PEER_ID, config=config)
+    app = KonsensusApp(config=config)
     app.run()
 
 
@@ -73,10 +73,10 @@ def instance_factory(count):
     #    'HDF5_REPO': None
     })
     configs.append(entry_point_config)
-    peers.append(('127.0.0.1', entry_point_config.PUB_PORT, entry_point_config.API_PORT))
+    peers.append(('127.0.0.1', entry_point_config['PUB_PORT'], entry_point_config['API_PORT']))
     for c in xrange(int(count)):
         config = make_config(c + 1)
-        peers.append(('127.0.0.1', config.PUB_PORT, config.API_PORT))
+        peers.append(('127.0.0.1', config['PUB_PORT'], config['API_PORT']))
         configs.append(config)
 
     from multiprocessing import Process
@@ -84,9 +84,9 @@ def instance_factory(count):
     pids = []
     for config in configs:
         #print('Going to cook an app #%s' % config.PEER_ID)
-        if config.HDF5_REPO:
-            make_hdf5(config.HDF5_REPO, 'ds%s' % config.PEER_ID)
-        config.PEERS = [p for p in peers if p != ('127.0.0.1', config.PUB_PORT, config.API_PORT)]
+        if config['HDF5_REPO']:
+            make_hdf5(config['HDF5_REPO'], 'ds%s' % config['PEER_ID'])
+        config.PEERS = [p for p in peers if p != ('127.0.0.1', config['PUB_PORT'], config['API_PORT'])]
         p = Process(target=_cook_and_run, kwargs={'config': config})
         p.start()
         #print('App #%s started.' % config.PEER_ID)

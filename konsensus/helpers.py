@@ -60,10 +60,6 @@ def recv_array(socket, flags=0, copy=True, track=False):
     return a.reshape(md['shape'])
 
 
-def whoami(config):
-    logger.debug('I am konsensus instance at %s:%s' % (config.HOST, config.API_PORT))
-
-
 def get_operation_store():
     """
     A shortcut method to return operation store

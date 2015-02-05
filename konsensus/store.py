@@ -61,7 +61,8 @@ class RandomDatasetStore(object):
                         api_endpoint=app.get_api_endpoint())
 
         # Let the other peer to catch the signal
-        #gevent.sleep(.1)
+        #TODO: Find an explicit way to make sure the other peer has got the message
+        gevent.sleep(.5)
 
         # logger.debug('Calling send_array')
         #helpers.send_array(socket, dataset)
@@ -119,6 +120,10 @@ class DistributedOperationStore(dict):
         else:
             # Update our info about operation
             self[operation_id].update(info)
+
+        # Calculate duration
+        if self[operation_id]['state'] == constants.OperationState.done.value:
+            info['duration'] = time.time() - self[operation_id]['submit_moment']
 
         # If we are the initiator peer we will publish this otherwise not.
         if publish:

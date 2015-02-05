@@ -18,15 +18,3 @@ class DefaultSettings(dict):
             'HDF5_REPO': './misc/samples/small.hdf5',
             'LOG_LEVEL': 'DEBUG'
         })
-
-    def __getattr__(self, item):
-        if item in self:
-            return self[item]
-        else:
-            return dict.__getattribute__(self, item)
-
-    def __setattr__(self, key, value):
-        if key in self:
-            self[key] = value
-        else:
-            dict.__setattr__(self, key, value)

@@ -24,15 +24,14 @@ from .manager import KonsensusManager
 app = None
 temp_repo = {}
 
+
 class KonsensusApp(object):
-    def __init__(self, name, host="0.0.0.0", port=None, config=None):
+    def __init__(self, ip="0.0.0.0", port=None, config=None):
         if not config:
             config = DefaultSettings()
         self.config = config
-        config['HOST'] = host
-        self.name = name
-        self.host = host
-        self.port = port or config.API_PORT
+        self.ip = ip
+        self.port = port or config['API_PORT']
         self._topic_handlers = {}
         self.manager = KonsensusManager(self.config)
 
@@ -40,11 +39,11 @@ class KonsensusApp(object):
         self.logger = logging.getLogger('konsensus')
         self.logger.propagate = False
         ch = logging.StreamHandler()
-        fmt = '%(levelname)s:%(name)s:l%(lineno)s:p' + str(config.API_PORT) + '\t %(message)s'
+        fmt = '%(levelname)s:%(name)s:l%(lineno)s:p' + str(config['API_PORT']) + '\t %(message)s'
         formatter = logging.Formatter(fmt)
         ch.setFormatter(formatter)
         self.logger.addHandler(ch)
-        self.logger.setLevel(config.LOG_LEVEL)
+        self.logger.setLevel(config['LOG_LEVEL'])
 
         global app
         app = self
@@ -107,8 +106,8 @@ class KonsensusApp(object):
                         gevent.spawn(self._subscribe_to_peers)])
 
     def _run_api_listener(self):
-        conn_string = "tcp://{host}:{port}".format(host=self.host,
-                                                   port=self.port)
+        conn_string = "tcp://{ip}:{port}".format(ip=self.ip,
+                                                 port=self.port)
         self.logger.info("Starting API at %s" % conn_string)
         self._register_handlers()
         self.api = KonsensusAPI(self.manager)
@@ -121,7 +120,7 @@ class KonsensusApp(object):
         Returns the api endpoint
         :return:
         """
-        return "tcp://%s:%s" % (self.host, self.port)
+        return "tcp://%s:%s" % (self.ip, self.port)
 
     def get_id(self):
         """
@@ -133,8 +132,8 @@ class KonsensusApp(object):
     def _run_publisher(self):
         context = zmq.Context()
         socket = context.socket(zmq.PUB)
-        self.logger.info('Starting publisher at tcp://*:%s' % self.config.PUB_PORT)
-        socket.bind("tcp://%s:%s" % (self.host, self.config.PUB_PORT))
+        self.logger.info('Starting publisher at tcp://*:%s' % self.config['PUB_PORT'])
+        socket.bind("tcp://%s:%s" % (self.ip, self.config['PUB_PORT']))
 
         def publish_handler(sender, topic=None, **kwargs):
             if not topic:
@@ -152,7 +151,7 @@ class KonsensusApp(object):
         """Check if ip and port points to myself"""
         import socket as sk
         self_ip = sk.gethostbyname(sk.gethostname())
-        self_port = self.config.API_PORT
+        self_port = self.config['API_PORT']
         return str(self_ip) == ip and self_port == port
 
     def _subscribe_to_peers(self):
@@ -160,11 +159,13 @@ class KonsensusApp(object):
         Run the required listeners
         :return:
         """
+        if not self.config['PEERS']:
+            return
         context = zmq.Context()
         socket = context.socket(zmq.SUB)
         socket.setsockopt(zmq.SUBSCRIBE, '')
 
-        for ip, pub_port, api_port in self.config.PEERS:
+        for ip, pub_port, api_port in self.config['PEERS']:
             if not self._is_self(ip, pub_port):
                 address = '%s:%s' % (ip, pub_port)
                 self.logger.debug('Subscribing to peer at: %s' % address)

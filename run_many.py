@@ -2,7 +2,7 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 import argparse
 
-from konsensus.test_helper import instance_factory
+from test_helper import instance_factory
 
 if __name__ == '__main__':
     """Helper to make konsensus servers with fake data and run them"""

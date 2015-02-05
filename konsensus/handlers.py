@@ -42,14 +42,6 @@ class DelegateTopicHandler(ZMQTopicHandlerBase):
             #                                                   delegate_info['dataset_id']))
             return
 
-        # Check command availability
-        if not manager.has_command(delegate_info['command']):
-            # Have the data but not the command
-            self.logger.debug('Ignoring a request for %s on dataset %s. The command is not available' %
-                              (delegate_info['command'],
-                               delegate_info['dataset_id']))
-            raise Exception('Unknown command %s ' % delegate_info['command'])
-
         # Adding host info to the delegate_info
         from .application import app
         delegate_info['peer'] = app.get_api_endpoint()  # socket.gethostname()

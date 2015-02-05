@@ -4,11 +4,12 @@
 
     This file is part of konsensus project.
 """
+import os
+
 import zerorpc
 import h5py
 import numpy as np
 
-from . import helpers
 from . import decorators
 from .store import RandomDatasetStore, DistributedOperationStore
 
@@ -23,17 +24,23 @@ class KonsensusManager(object):
         self.config = config
         self.local_datasets = {}
         self._load_datasets()
-        self._store = RandomDatasetStore(config.PEERS)
+        self._store = RandomDatasetStore(config['PEERS'])
         self._operation_store = DistributedOperationStore(self)
 
     def _load_datasets(self):
-        import h5py
-        if self.config.HDF5_REPO:
-            f = h5py.File(self.config.HDF5_REPO, 'r')
-            for key, value in f.iteritems():
-                if isinstance(value, h5py.Dataset):
-                    self._add_dataset(key, value)
-            f.close()
+        try:
+            import h5py
+            if not os.path.exists(self.config['HDF5_REPO']):
+                f = h5py.File(self.config['HDF5_REPO'], 'w')
+                f.close()
+            else:
+                f = h5py.File(self.config['HDF5_REPO'], 'r')
+                for key, value in f.iteritems():
+                    if isinstance(value, h5py.Dataset):
+                        self._add_dataset(key, value)
+                f.close()
+        except Exception, e:
+            raise Exception('Problem loading/creating local repository, %s' % e)
 
     def _add_dataset(self, key, dataset):
         """
@@ -61,7 +68,6 @@ class KonsensusManager(object):
         dataset = c.get_dataset(dataset_id)
         return dataset
 
-
     def get_dataset(self, dataset_id):
         """
         Get a specifc dataset
@@ -77,7 +83,7 @@ class KonsensusManager(object):
                     return self.get_remote_dataset(peer_api_endpoint, dataset_id)
             raise Exception('Dataset %s neither is available locally nor on the network' % dataset_id)
 
-        f = h5py.File(self.config.HDF5_REPO, 'r')
+        f = h5py.File(self.config['HDF5_REPO'], 'r')
         return np.array(f.get(dataset_id))
 
     def get_global_dataset_map(self):
@@ -86,11 +92,12 @@ class KonsensusManager(object):
         :return:
         """
         datasets = {}
-        for peer_ip, pub_port, api_port in self.config.PEERS:
-            key = 'tcp://%s:%s' % (peer_ip, api_port)
-            c = zerorpc.Client()
-            c.connect('tcp://%s:%s' % (peer_ip, api_port))
-            datasets[key] = c.get_dataset_map()
+        if self.config.get('PEERS'):
+            for peer_ip, pub_port, api_port in self.config['PEERS']:
+                key = 'tcp://%s:%s' % (peer_ip, api_port)
+                c = zerorpc.Client()
+                c.connect('tcp://%s:%s' % (peer_ip, api_port))
+                datasets[key] = c.get_dataset_map()
 
         # Add local ones as well
         from .application import app
@@ -119,17 +126,9 @@ class KonsensusManager(object):
         """
         return dataset_id in self.local_datasets
 
-    def has_command(self, command):
-        """
-        Check if the given string represents a method on this class
-        :param command:
-        :return:
-        """
-        return hasattr(self, command)
-
     def get_peers(self):
         """Returns the peers"""
-        return self.config.PEERS
+        return self.config['PEERS']
 
     @decorators.delegate
     def use_case_1(self, dataset_id, **kwargs):
@@ -145,7 +144,7 @@ class KonsensusManager(object):
         if dataset_id not in self.local_datasets:
             raise Exception("I don't have dataset %s" % dataset_id)
 
-        f = h5py.File(self.config.HDF5_REPO, 'r')
+        f = h5py.File(self.config['HDF5_REPO'], 'r')
         result = np.array(f.get(dataset_id))
         for i in xrange(len(result)):
             result[i] = np.mod(result[i], 2)
@@ -190,10 +189,6 @@ class KonsensusManager(object):
         # Update distributed operation store
         self._operation_store.update(result_dataset_id=result_dataset_id, **kwargs)
 
-    #@decorators.register
-    def dummy(self, *args, **kwargs):
-        pass
-
     def store_array(self, array, name):
         """
         Store the given numpy array into hdf5 repo
@@ -201,8 +196,7 @@ class KonsensusManager(object):
         :param name:
         :return:
         """
-        self.logger.debug('Opening hdf5 repo %s' % self.config.HDF5_REPO)
-        f = h5py.File(self.config.HDF5_REPO, 'r+')
+        f = h5py.File(self.config['HDF5_REPO'], 'r+')
         ds = None
         if name in self.local_datasets:
             self.logger.warning('Going to override dataset %s' % name)
@@ -211,6 +205,7 @@ class KonsensusManager(object):
             ds = f.create_dataset(name, array.shape, array.dtype)
         ds[...] = array
         self._add_dataset(name, ds)
+        self.logger.debug('Dataset stored in hdf5 repo %s' % self.config['HDF5_REPO'])
         f.close()
 
     def list(self, command):
@@ -224,7 +219,7 @@ class KonsensusManager(object):
             return self.get_global_dataset_map()
 
         elif command == 'peers':
-            return self.config.PEERS
+            return self.get_peers()
 
         elif command == 'operations':
             return self.get_operations()

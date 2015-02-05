@@ -25,23 +25,6 @@ class KonsensusAPI(object):
         """
         return self._manager.get_dataset_map(*args, **kwargs)
 
-    # def run_operation(self, name, *args, **kwargs):
-    #     """
-    #     To run an op
-    #     :return:
-    #     """
-    #     return self._manager.run_operation(name, *args, **kwargs)
-
-    def dummy(self, *args, **kwargs):
-        return self._manager.dummy(*args, **kwargs)
-
-    # def get_operations(self):
-    #     """
-    #     Returns list of commands.
-    #     :return:
-    #     """
-    #     return self._manager.get_commands()
-
     def use_case_1(self, dataset, *args, **kargs):
         """
         Invokes operation for use case 1 described in the report. Accepts 'peers', 'datasets' and 'operations as option.

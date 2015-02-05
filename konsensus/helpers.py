@@ -38,7 +38,7 @@ def is_running_instance(config, ip, port):
     :return:
     """
     local_ip = socket.gethostbyname(socket.gethostname())
-    return ip in (local_ip, '127.0.0.1', 'localhost') and port == config.API_PORT
+    return ip in (local_ip, '127.0.0.1', 'localhost') and port == config['API_PORT']
 
 
 def send_array(socket, A, flags=0, copy=True, track=False):
